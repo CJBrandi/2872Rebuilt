@@ -38,4 +38,8 @@ public final class Constants {
   public static class ShooterConstants {
     public static final double stepUp = 2;
   }
+
+  public static class IntakeConstants {
+    public static final double stepUp = 2;
+  }
 }

@@ -11,7 +11,6 @@ import frc.robot.RobotState;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.FieldConstants;
 import frc.robot.util.LoggedTunableNumber;
-import java.util.function.DoubleSupplier;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;

@@ -24,6 +24,9 @@ import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.IntakeIO;
+import frc.robot.subsystems.intake.IntakeIOSim;
 import frc.robot.subsystems.superstructure.shooter.Shooter;
 import frc.robot.subsystems.superstructure.shooter.ShooterIO;
 import frc.robot.subsystems.superstructure.shooter.ShooterIOSim;
@@ -43,7 +46,7 @@ public class RobotContainer {
   private final Drive drive;
   private final Turret turret;
   private final Shooter shooter;
-
+  private final Intake intake;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
@@ -64,6 +67,7 @@ public class RobotContainer {
 
         turret = new Turret(new TurretIO() {});
         shooter = new Shooter(new ShooterIO() {});
+        intake = new Intake(new IntakeIO() {});
 
         break;
 
@@ -79,6 +83,8 @@ public class RobotContainer {
 
         turret = new Turret(new TurretIOSim() {});
         shooter = new Shooter(new ShooterIOSim() {});
+        intake = new Intake(new IntakeIOSim() {});
+
         break;
 
       default:
@@ -93,6 +99,8 @@ public class RobotContainer {
 
         turret = new Turret(new TurretIO() {});
         shooter = new Shooter(new ShooterIO() {});
+        intake = new Intake(new IntakeIO() {});
+
         break;
     }
 
@@ -144,8 +152,8 @@ public class RobotContainer {
                 () -> -controller.getLeftX(),
                 () -> Rotation2d.kZero));
 
-    // Switch to X pattern when X button is pressed
-    controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
+    // C
+    controller.x().whileTrue(Commands.run(intake::runIntake));
 
     // Reset gyro to 0° when B button is pressed
     controller
