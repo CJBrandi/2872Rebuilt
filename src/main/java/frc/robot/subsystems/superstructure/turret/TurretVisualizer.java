@@ -18,7 +18,7 @@ public class TurretVisualizer {
    * @param turretAngleRad The current turret angle in radians (robot-relative)
    */
   public static void update(double turretAngleRad) {
-    Pose2d robotPose = RobotState.getInstance().getPose();
+    Pose2d robotPose = RobotState.getInstance().getRobotPose();
     double robotAngleRad = robotPose.getRotation().getRadians();
     double turretFieldAngle = turretAngleRad + robotAngleRad;
 

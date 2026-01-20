@@ -7,12 +7,14 @@ import edu.wpi.first.math.system.NumericalIntegration;
 import edu.wpi.first.math.system.plant.DCMotor;
 import frc.robot.Constants;
 
-public class ShooterIOSim implements ShooterIO {
+public class FlywheelIOSim implements FlywheelIO {
   // Moment of inertia for flywheel (kg*m^2)
-  private static final double moi = 0.005;
+  private static final double MOI = 0.005;
 
-  private static final DCMotor gearbox =
-      DCMotor.getKrakenX60Foc(1).withReduction(Constants.ShooterConstants.stepUp);
+  // REV Vortex (NEO Vortex) with step-up gearing (flywheel spins faster than motor)
+  // stepUp = 2 means flywheel is 2x motor speed, so reduction ratio = 1/stepUp = 0.5
+  private static final DCMotor GEARBOX =
+      DCMotor.getNeoVortex(1).withReduction(1.0 / Constants.ShooterConstants.flywheelStepUp);
 
   // State-space model for velocity only: dx/dt = A*x + B*u
   // For a flywheel: dω/dt = -Kt/(Kv*R*J) * ω + Kt/(R*J) * I
@@ -21,8 +23,8 @@ public class ShooterIOSim implements ShooterIO {
       MatBuilder.fill(
           Nat.N1(),
           Nat.N1(),
-          -gearbox.KtNMPerAmp / (gearbox.KvRadPerSecPerVolt * gearbox.rOhms * moi));
-  private static final Vector<N1> B = VecBuilder.fill(gearbox.KtNMPerAmp / moi);
+          -GEARBOX.KtNMPerAmp / (GEARBOX.KvRadPerSecPerVolt * GEARBOX.rOhms * MOI));
+  private static final Vector<N1> B = VecBuilder.fill(GEARBOX.KtNMPerAmp / MOI);
 
   // State: angular velocity (rad/s)
   private Vector<N1> simState;
@@ -33,12 +35,12 @@ public class ShooterIOSim implements ShooterIO {
   private double feedforward = 0.0;
   private boolean closedLoop = false;
 
-  public ShooterIOSim() {
+  public FlywheelIOSim() {
     simState = VecBuilder.fill(0.0);
   }
 
   @Override
-  public void updateInputs(ShooterIOInputs inputs) {
+  public void updateInputs(FlywheelIOInputs inputs) {
     if (!closedLoop) {
       controller.reset();
       update(Constants.loopPeriodSecs);
@@ -95,13 +97,13 @@ public class ShooterIOSim implements ShooterIO {
 
   private void setInputTorqueCurrent(double torqueCurrent) {
     inputTorqueCurrent = MathUtil.clamp(torqueCurrent, -40.0, 40.0);
-    appliedVolts = gearbox.getVoltage(gearbox.getTorque(inputTorqueCurrent), simState.get(0));
+    appliedVolts = GEARBOX.getVoltage(GEARBOX.getTorque(inputTorqueCurrent), simState.get(0));
     appliedVolts = MathUtil.clamp(appliedVolts, -12.0, 12.0);
   }
 
   private void setInputVoltage(double voltage) {
     voltage = MathUtil.clamp(voltage, -12.0, 12.0);
-    setInputTorqueCurrent(gearbox.getCurrent(simState.get(0), voltage));
+    setInputTorqueCurrent(GEARBOX.getCurrent(simState.get(0), voltage));
   }
 
   private void update(double dt) {
@@ -116,7 +118,7 @@ public class ShooterIOSim implements ShooterIO {
 
     // No position limits for a flywheel - it spins freely
     // Optionally clamp to reasonable velocity limits to prevent numerical issues
-    double maxVelocity = gearbox.freeSpeedRadPerSec;
+    double maxVelocity = GEARBOX.freeSpeedRadPerSec;
     if (Math.abs(simState.get(0)) > maxVelocity) {
       simState = VecBuilder.fill(Math.signum(simState.get(0)) * maxVelocity);
     }

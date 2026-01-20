@@ -24,18 +24,19 @@ import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.superstructure.Superstructure;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
-import frc.robot.subsystems.superstructure.indexer.IndexerIO;
-import frc.robot.subsystems.superstructure.indexer.IndexerIOSim;
-import frc.robot.subsystems.intake.Intake;
-import frc.robot.subsystems.intake.IntakeIO;
-import frc.robot.subsystems.intake.IntakeIOSim;
+import frc.robot.subsystems.superstructure.shooter.FlywheelIO;
+import frc.robot.subsystems.superstructure.shooter.FlywheelIOSim;
+import frc.robot.subsystems.superstructure.shooter.FlywheelIOSparkFlex;
+import frc.robot.subsystems.superstructure.shooter.HoodIO;
+import frc.robot.subsystems.superstructure.shooter.HoodIOSim;
+import frc.robot.subsystems.superstructure.shooter.HoodIOTalonFX;
 import frc.robot.subsystems.superstructure.shooter.Shooter;
-import frc.robot.subsystems.superstructure.shooter.ShooterIO;
-import frc.robot.subsystems.superstructure.shooter.ShooterIOSim;
 import frc.robot.subsystems.superstructure.turret.Turret;
 import frc.robot.subsystems.superstructure.turret.TurretIO;
 import frc.robot.subsystems.superstructure.turret.TurretIOSim;
+import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -47,9 +48,7 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 public class RobotContainer {
   // Subsystems
   private final Drive drive;
-  private final Turret turret;
-  private final Shooter shooter;
-  private final Indexer indexer;
+  private final Superstructure superstructure;
 
   private final Intake intake;
   // Controller
@@ -70,10 +69,17 @@ public class RobotContainer {
                 new ModuleIOTalonFX(TunerConstants.BackLeft),
                 new ModuleIOTalonFX(TunerConstants.BackRight));
 
-        turret = new Turret(new TurretIO() {});
-        shooter = new Shooter(new ShooterIO() {});
-        indexer = new Indexer(new IndexerIO() {});
-        intake = new Intake(new IntakeIO() {});
+        superstructure =
+            new Superstructure(
+                new Shooter(
+                    new FlywheelIOSparkFlex(Constants.ShooterConstants.flywheelCanId),
+                    new HoodIOTalonFX(
+                        Constants.ShooterConstants.hoodCanId,
+                        Constants.ShooterConstants.hoodCanBus)),
+                new Turret(
+                    new TurretIOTalonFX(
+                        Constants.TurretConstants.canId, Constants.TurretConstants.canBus)),
+                new Indexer());
 
         break;
 
@@ -87,11 +93,11 @@ public class RobotContainer {
                 new ModuleIOSim(TunerConstants.BackLeft),
                 new ModuleIOSim(TunerConstants.BackRight));
 
-        turret = new Turret(new TurretIOSim() {});
-        shooter = new Shooter(new ShooterIOSim() {});
-        indexer = new Indexer(new IndexerIOSim() {});
-        intake = new Intake(new IntakeIOSim() {});
-
+        superstructure =
+            new Superstructure(
+                new Shooter(new FlywheelIOSim(), new HoodIOSim()),
+                new Turret(new TurretIOSim()),
+                new Indexer());
         break;
 
       default:
@@ -104,11 +110,11 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {});
 
-        turret = new Turret(new TurretIO() {});
-        shooter = new Shooter(new ShooterIO() {});
-        indexer = new Indexer(new IndexerIO() {});
-        intake = new Intake(new IntakeIO() {});
-
+        superstructure =
+            new Superstructure(
+                new Shooter(new FlywheelIO() {}, new HoodIO() {}),
+                new Turret(new TurretIO() {}),
+                new Indexer());
         break;
     }
 

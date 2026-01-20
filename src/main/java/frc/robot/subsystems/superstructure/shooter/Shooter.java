@@ -1,108 +1,115 @@
 package frc.robot.subsystems.superstructure.shooter;
 
-import edu.wpi.first.math.filter.Debouncer;
-import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.util.EqualsUtil;
-import frc.robot.util.LoggedTunableNumber;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-public class Shooter extends SubsystemBase {
+/**
+ * Shooter coordinator. Receives goal values from Superstructure and delegates control to Flywheel
+ * and Hood components. This is not a Subsystem - it's managed by Superstructure.
+ */
+@Getter
+public class Shooter {
 
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/kP", 0.05);
-  private static final LoggedTunableNumber kI = new LoggedTunableNumber("Shooter/kI", 0.0);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/kD", 0.0);
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Shooter/kV", 0.02);
+  /** -- GETTER -- Returns the flywheel component for direct access if needed. */
+  private final Flywheel flywheel;
+  /** -- GETTER -- Returns the hood component for direct access if needed. */
+  private final Hood hood;
 
-  private final ShooterIO io;
-  private final ShooterIOInputsAutoLogged inputs = new ShooterIOInputsAutoLogged();
-  private final Debouncer motorConnectedDebouncer =
-      new Debouncer(0.5, Debouncer.DebounceType.kFalling);
+  // Goal values set by Superstructure
+  private double goalExitVelocityMps = 0.0;
+  private double goalHoodAngleRad = Hood.getMinAngleRad();
+  private double goalHoodVelocityRadPerSec = 0.0;
 
-  @Getter private double velocitySetpointRadPerSec = 0.0;
-  private boolean closedLoop = false;
-
-  @Getter
-  @AutoLogOutput(key = "Shooter/AtSetpoint")
-  private boolean atSetpoint = false;
-
-  public Shooter(ShooterIO io) {
-    this.io = io;
+  public Shooter(FlywheelIO flywheelIO, HoodIO hoodIO) {
+    this.flywheel = new Flywheel(flywheelIO);
+    this.hood = new Hood(hoodIO);
   }
 
-  @Override
   public void periodic() {
-    io.updateInputs(inputs);
-    Logger.processInputs("Shooter", inputs);
+    // Update flywheel and hood
+    flywheel.periodic();
+    hood.periodic();
 
-    // Update PID gains if changed
-    LoggedTunableNumber.ifChanged(
-        hashCode(), () -> io.setPID(kP.get(), kI.get(), kD.get()), kP, kI, kD);
+    // Apply goals to components
+    flywheel.setTargetExitVelocity(goalExitVelocityMps);
+    hood.setTargetAngle(goalHoodAngleRad, goalHoodVelocityRadPerSec);
 
-    // Check if at setpoint (within tolerance)
-    if (closedLoop) {
-      double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(50);
-      atSetpoint =
-          EqualsUtil.epsilonEquals(
-              inputs.velocityRadPerSec, velocitySetpointRadPerSec, toleranceRadPerSec);
-    } else {
-      atSetpoint = false;
-    }
-
-    Logger.recordOutput("Shooter/Profile/SetpointVelocityRadPerSec", velocitySetpointRadPerSec);
-    Logger.recordOutput(
-        "Shooter/Profile/SetpointVelocityRPM",
-        Units.radiansPerSecondToRotationsPerMinute(velocitySetpointRadPerSec));
-    Logger.recordOutput("Shooter/Profile/ActualVelocityRadPerSec", inputs.velocityRadPerSec);
-    Logger.recordOutput(
-        "Shooter/Profile/ActualVelocityRPM",
-        Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
-    Logger.recordOutput(
-        "Shooter/Profile/VelocityErrorRadPerSec",
-        velocitySetpointRadPerSec - inputs.velocityRadPerSec);
-    Logger.recordOutput("Shooter/ClosedLoop", closedLoop);
+    // Log goal values
+    Logger.recordOutput("Shooter/GoalExitVelocityMps", goalExitVelocityMps);
+    Logger.recordOutput("Shooter/GoalHoodAngleRad", goalHoodAngleRad);
+    Logger.recordOutput("Shooter/GoalHoodAngleDeg", Math.toDegrees(goalHoodAngleRad));
+    Logger.recordOutput("Shooter/GoalHoodVelocityRadPerSec", goalHoodVelocityRadPerSec);
+    Logger.recordOutput("Shooter/Ready", isReady());
   }
 
-  public void runVelocity(double velocityRadPerSec) {
-    closedLoop = true;
-    velocitySetpointRadPerSec = velocityRadPerSec;
-    double feedforward = kV.get() * velocityRadPerSec;
-    io.runVelocity(velocityRadPerSec, feedforward);
+  /**
+   * Sets the shooter goals. Called by Superstructure.
+   *
+   * @param exitVelocityMps Target ball exit velocity in m/s
+   * @param hoodAngleRad Target hood angle in radians
+   * @param hoodVelocityRadPerSec Hood feedforward velocity in rad/s
+   */
+  public void setGoals(double exitVelocityMps, double hoodAngleRad, double hoodVelocityRadPerSec) {
+    this.goalExitVelocityMps = exitVelocityMps;
+    this.goalHoodAngleRad = hoodAngleRad;
+    this.goalHoodVelocityRadPerSec = hoodVelocityRadPerSec;
   }
 
-  public void runVelocityRPM(double velocityRPM) {
-    runVelocity(Units.rotationsPerMinuteToRadiansPerSecond(velocityRPM));
+  /**
+   * Sets the shooter goals with no hood feedforward velocity.
+   *
+   * @param exitVelocityMps Target ball exit velocity in m/s
+   * @param hoodAngleRad Target hood angle in radians
+   */
+  public void setGoals(double exitVelocityMps, double hoodAngleRad) {
+    setGoals(exitVelocityMps, hoodAngleRad, 0.0);
   }
 
-  public void runVolts(double volts) {
-    closedLoop = false;
-    velocitySetpointRadPerSec = 0.0;
-    io.runVolts(volts);
+  /** Returns whether both flywheel and hood are at their setpoints. */
+  @AutoLogOutput(key = "Shooter/Ready")
+  public boolean isReady() {
+    return flywheel.isAtSetpoint() && hood.isAtGoal();
   }
 
-  public void runOpenLoop(double output) {
-    closedLoop = false;
-    velocitySetpointRadPerSec = 0.0;
-    io.runOpenLoop(output);
+  /** Returns whether the flywheel is at its velocity setpoint. */
+  public boolean isFlywheelReady() {
+    return flywheel.isAtSetpoint();
   }
 
+  /** Returns whether the hood is at its angle setpoint. */
+  public boolean isHoodReady() {
+    return hood.isAtGoal();
+  }
+
+  /** Returns the current ball exit velocity in m/s. */
+  public double getExitVelocityMps() {
+    return flywheel.getExitVelocityMps();
+  }
+
+  /** Returns the current hood angle in radians. */
+  public double getHoodAngleRad() {
+    return hood.getAngle().getRadians();
+  }
+
+  // ==================== Direct control methods (for testing/characterization) ====================
+
+  /** Runs flywheel at specified voltage (bypasses goal system). */
+  public void runFlywheelVolts(double volts) {
+    goalExitVelocityMps = 0.0;
+    flywheel.runVolts(volts);
+  }
+
+  /** Runs hood at specified voltage (bypasses goal system). */
+  public void runHoodVolts(double volts) {
+    goalHoodAngleRad = hood.getAngle().getRadians();
+    hood.runVolts(volts);
+  }
+
+  /** Stops all motors (sets goals to zero/min positions). */
   public void stop() {
-    closedLoop = false;
-    velocitySetpointRadPerSec = 0.0;
-    io.stop();
-  }
-
-  public double getVelocityRadPerSec() {
-    return inputs.velocityRadPerSec;
-  }
-
-  public double getVelocityRPM() {
-    return Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec);
-  }
-
-  public boolean isMotorConnected() {
-    return motorConnectedDebouncer.calculate(inputs.motorConnected);
+    goalExitVelocityMps = 0.0;
+    goalHoodAngleRad = Hood.getMinAngleRad();
+    goalHoodVelocityRadPerSec = 0.0;
   }
 }

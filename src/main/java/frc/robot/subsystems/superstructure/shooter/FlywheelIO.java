@@ -2,9 +2,9 @@ package frc.robot.subsystems.superstructure.shooter;
 
 import org.littletonrobotics.junction.AutoLog;
 
-public interface ShooterIO {
+public interface FlywheelIO {
   @AutoLog
-  class ShooterIOInputs {
+  class FlywheelIOInputs {
     public boolean motorConnected = true;
     public boolean encoderConnected = true;
 
@@ -14,7 +14,7 @@ public interface ShooterIO {
     public double tempCelsius = 0.0;
   }
 
-  default void updateInputs(ShooterIOInputs inputs) {}
+  default void updateInputs(FlywheelIOInputs inputs) {}
 
   default void runOpenLoop(double output) {}
 

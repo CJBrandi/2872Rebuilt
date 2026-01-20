@@ -32,11 +32,22 @@ public final class Constants {
   }
 
   public static class TurretConstants {
+    public static final int canId = 20;
+    public static final String canBus = "";
     public static final double reduction = 5;
   }
 
   public static class ShooterConstants {
-    public static final double stepUp = 2;
+    // CAN IDs
+    public static final int flywheelCanId = 21;
+    public static final int hoodCanId = 22;
+    public static final String hoodCanBus = "";
+
+    // Flywheel: REV Vortex with 2:1 step-up (flywheel spins 2x motor speed)
+    public static final double flywheelStepUp = 2.0;
+
+    // Hood: Falcon 500 with reduction gearing
+    public static final double hoodReduction = 50.0;
   }
 
   public static class IndexerConstants {
