@@ -13,7 +13,8 @@ public class TurretIOSim implements TurretIO {
   private static final double moi = 0.5;
 
   public static final DCMotor gearbox =
-      DCMotor.getKrakenX60Foc(1).withReduction(Constants.TurretConstants.reduction);
+      DCMotor.getKrakenX60Foc(1)
+          .withReduction(Constants.SuperstructureConstants.TurretConstants.reduction);
   public static final Matrix<N2, N2> A =
       MatBuilder.fill(
           Nat.N2(),
@@ -117,14 +118,6 @@ public class TurretIOSim implements TurretIO {
 
     simState = VecBuilder.fill(updatedState.get(0, 0), updatedState.get(1, 0));
 
-    // Apply turret rotation limits (0 to 270 degrees)
-    if (simState.get(0) <= 0.0) {
-      simState.set(1, 0, 0.0);
-      simState.set(0, 0, 0.0);
-    }
-    if (simState.get(0) >= (3 * Math.PI) / 2) {
-      simState.set(1, 0, 0.0);
-      simState.set(0, 0, (3 * Math.PI) / 2);
-    }
+    // No hard limits - turret uses continuous rotation with wrap-around logic
   }
 }

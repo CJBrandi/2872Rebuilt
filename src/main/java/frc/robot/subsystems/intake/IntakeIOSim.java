@@ -22,7 +22,7 @@ public class IntakeIOSim implements IntakeIO {
           Nat.N1(),
           Nat.N1(),
           -gearbox.KtNMPerAmp / (gearbox.KvRadPerSecPerVolt * gearbox.rOhms * moi));
-  private static final Vector<N1> B = VecBuilder.fill(gearbox.KtNMPerAmp /(gearbox.rOhms* moi));
+  private static final Vector<N1> B = VecBuilder.fill(gearbox.KtNMPerAmp / (gearbox.rOhms * moi));
 
   // State: angular velocity (rad/s)
   private Vector<N1> simState;

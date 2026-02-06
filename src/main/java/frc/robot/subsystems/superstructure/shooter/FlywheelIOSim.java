@@ -14,7 +14,9 @@ public class FlywheelIOSim implements FlywheelIO {
   // REV Vortex (NEO Vortex) with step-up gearing (flywheel spins faster than motor)
   // stepUp = 2 means flywheel is 2x motor speed, so reduction ratio = 1/stepUp = 0.5
   private static final DCMotor GEARBOX =
-      DCMotor.getNeoVortex(1).withReduction(1.0 / Constants.ShooterConstants.flywheelStepUp);
+      DCMotor.getNeoVortex(1)
+          .withReduction(
+              1.0 / Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.stepUp);
 
   // State-space model for velocity only: dx/dt = A*x + B*u
   // For a flywheel: dω/dt = -Kt/(Kv*R*J) * ω + Kt/(R*J) * I
@@ -32,7 +34,8 @@ public class FlywheelIOSim implements FlywheelIO {
   private double appliedVolts = 0.0;
 
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
-  private double feedforward = 0.0;
+  private double kS = 0.0;
+  private double kV = 0.0;
   private boolean closedLoop = false;
 
   public FlywheelIOSim() {
@@ -46,6 +49,8 @@ public class FlywheelIOSim implements FlywheelIO {
       update(Constants.loopPeriodSecs);
     } else {
       // Run control at 1kHz for more accurate simulation
+      double setpoint = controller.getSetpoint();
+      double feedforward = (setpoint > 0 ? kS : 0) + kV * setpoint;
       for (int i = 0; i < (int) (Constants.loopPeriodSecs / (1.0 / 1000.0)); i++) {
         // Use velocity (simState.get(0)) as the measurement for velocity control
         setInputTorqueCurrent(controller.calculate(simState.get(0)) + feedforward);
@@ -79,10 +84,15 @@ public class FlywheelIOSim implements FlywheelIO {
   }
 
   @Override
-  public void runVelocity(double radsPerSec, double feedforward) {
+  public void runVelocity(double radsPerSec) {
     closedLoop = true;
     controller.setSetpoint(radsPerSec);
-    this.feedforward = feedforward;
+  }
+
+  @Override
+  public void setFF(double kS, double kV) {
+    this.kS = kS;
+    this.kV = kV;
   }
 
   @Override

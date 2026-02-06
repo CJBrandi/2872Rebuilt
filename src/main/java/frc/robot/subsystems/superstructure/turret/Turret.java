@@ -1,12 +1,13 @@
 package frc.robot.subsystems.superstructure.turret;
 
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.Constants;
 import frc.robot.RobotState;
 import frc.robot.util.EqualsUtil;
@@ -18,18 +19,28 @@ import org.littletonrobotics.junction.Logger;
 /** Turret control. This is not a Subsystem - it's managed by Superstructure. */
 public class Turret {
 
-  // Turret angle limits (relative to robot, in radians)
-  private static final double MIN_ANGLE_RAD = 0.0;
-  private static final double MAX_ANGLE_RAD = (3 * Math.PI) / 2; // 270 degrees
-
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Turret/kP", 5.0);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Turret/kD", 0.1);
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Turret/kS", 0.2);
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Turret/kV", 0.1);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Turret/kP", 80);
+  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Turret/kD", 0);
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Turret/kS", 0.4);
+  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Turret/kV", 0.0);
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Turret/MaxVelocityDegreesPerSec", 1500.0);
+      new LoggedTunableNumber("Turret/MaxVelocityDegreesPerSec", 45);
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Turret/MaxAccelerationDegreesPerSec2", 2500.0);
+      new LoggedTunableNumber("Turret/MaxAccelerationDegreesPerSec2", 90);
+  private static final LoggedTunableNumber homingVolts =
+      new LoggedTunableNumber("Turret/HomingVolts", 2.0);
+  private static final LoggedTunableNumber homingStallVelocityThresh =
+      new LoggedTunableNumber("Turret/HomingStallVelocityThreshRadPerSec", 0.1);
+  private static final LoggedTunableNumber homingStallTimeSecs =
+      new LoggedTunableNumber("Turret/HomingStallTimeSecs", 0.25);
+  private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
+      new LoggedTunableNumber("Turret/StaticCharacterizationVelocityThreshRadPerSec", 0.1);
+
+  // Manual mode tunables
+  private static final LoggedTunableNumber manualModeEnabled =
+      new LoggedTunableNumber("Turret/ManualModeEnabled", 0.0);
+  private static final LoggedTunableNumber manualAngleDeg =
+      new LoggedTunableNumber("Turret/ManualAngleDeg", 0.0);
 
   private final TurretIO turretIO;
   private final TurretIOInputsAutoLogged inputs = new TurretIOInputsAutoLogged();
@@ -45,7 +56,15 @@ public class Turret {
   @Getter private double targetVelocityRadPerSec = 0.0; // Feedforward velocity from ShotCalculator
 
   // Wrap-around tracking - remembers last goal to pick closest valid solution
-  private double lastGoalAngle = (MIN_ANGLE_RAD + MAX_ANGLE_RAD) / 2.0;
+  private double lastGoalAngle = 0.0;
+
+  private boolean homed = false;
+
+  @AutoLogOutput(key = "Turret/HomedPositionRad")
+  private double homedPosition = 0.0;
+
+  private int homingDirection = 1; // 1 = positive, -1 = negative
+  private Debouncer homingStallDebouncer = new Debouncer(0.25, Debouncer.DebounceType.kRising);
 
   private boolean closedLoop = false;
 
@@ -107,8 +126,15 @@ public class Turret {
             new RobotState.TurretObservation(
                 Timer.getFPGATimestamp(), inputs.motorEncoderPosition));
 
+    // Manual mode - use tunable angle as target
+    if (manualModeEnabled.get() > 0.5) {
+      setTargetTurretAngle(Rotation2d.fromDegrees(manualAngleDeg.get()));
+    }
+
     // Run closed loop control if enabled and we have a target
-    if (closedLoop && targetFieldRelativeAngle != null) {
+    // Manual mode disables automatic field-relative calculations
+    boolean manualMode = manualModeEnabled.get() > 0.5;
+    if (closedLoop && targetFieldRelativeAngle != null && !manualMode) {
       // Convert field-relative angle to robot-relative angle
       double robotAngleRad = RobotState.getInstance().getRobotPose().getRotation().getRadians();
       double robotAngularVelocity =
@@ -169,27 +195,14 @@ public class Turret {
 
   /**
    * Finds the best turret angle among all valid ±2π wraps. Picks the angle closest to the last goal
-   * to minimize travel and avoid unnecessary wrapping.
+   * to minimize travel and avoid unnecessary wrapping. No angle limits - turret can rotate freely.
    */
   private double findBestAngle(double robotRelativeGoalRad) {
-    boolean hasBestAngle = false;
-    double bestAngle = lastGoalAngle;
+    double bestAngle = robotRelativeGoalRad;
 
-    // Check all possible wraps: -2, -1, 0, +1, +2 rotations
+    // Check all possible wraps: -2, -1, 0, +1, +2 rotations and pick closest to last goal
     for (int i = -2; i <= 2; i++) {
       double potentialAngle = robotRelativeGoalRad + 2.0 * Math.PI * i;
-
-      // Skip if outside turret limits
-      if (potentialAngle < MIN_ANGLE_RAD || potentialAngle > MAX_ANGLE_RAD) {
-        continue;
-      }
-
-      // First valid angle becomes the initial best
-      if (!hasBestAngle) {
-        bestAngle = potentialAngle;
-        hasBestAngle = true;
-        continue;
-      }
 
       // Pick the angle closest to last goal (minimizes travel)
       if (Math.abs(potentialAngle - lastGoalAngle) < Math.abs(bestAngle - lastGoalAngle)) {
@@ -197,16 +210,12 @@ public class Turret {
       }
     }
 
-    // If no valid angle found, clamp to limits
-    if (!hasBestAngle) {
-      bestAngle = MathUtil.clamp(robotRelativeGoalRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD);
-    }
-
     return bestAngle;
   }
 
   private void logState() {
     Logger.recordOutput("Turret/ClosedLoop", closedLoop);
+    Logger.recordOutput("Turret/ManualMode", manualModeEnabled.get() > 0.5);
     Logger.recordOutput(
         "Turret/TargetFieldRelativeAngleDeg",
         targetFieldRelativeAngle != null ? targetFieldRelativeAngle.getDegrees() : 0.0);
@@ -310,5 +319,97 @@ public class Turret {
   /** Returns whether the motor is connected. */
   public boolean isMotorConnected() {
     return motorConnectedDebouncer.calculate(inputs.motorConnected);
+  }
+
+  public Command homingSequence() {
+    return Commands.startRun(
+            () -> {
+              closedLoop = false;
+              homed = false;
+              homingDirection = 1;
+              homingStallDebouncer =
+                  new Debouncer(homingStallTimeSecs.get(), Debouncer.DebounceType.kRising);
+              homingStallDebouncer.calculate(false);
+            },
+            () -> {
+              turretIO.runVolts(homingVolts.get() * homingDirection);
+
+              // Check hall effect sensors
+              if (inputs.hallEffectState[0]) {
+                homed = true;
+                homedPosition =
+                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall;
+              } else if (inputs.hallEffectState[1]) {
+                homed = true;
+                homedPosition =
+                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.middleHall;
+              } else if (inputs.hallEffectState[2]) {
+                homed = true;
+                homedPosition =
+                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall;
+              }
+
+              // Check for stall (hit limit without finding sensor) and reverse direction
+              boolean stalled =
+                  homingStallDebouncer.calculate(
+                      Math.abs(inputs.velocityRadPerSec) < homingStallVelocityThresh.get());
+              if (stalled && !homed) {
+                homingDirection *= -1;
+                homingStallDebouncer =
+                    new Debouncer(homingStallTimeSecs.get(), Debouncer.DebounceType.kRising);
+                homingStallDebouncer.calculate(false);
+              }
+
+              Logger.recordOutput("Turret/Homing/Direction", homingDirection);
+              Logger.recordOutput("Turret/Homing/Stalled", stalled);
+            })
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              turretIO.stop();
+              resetPosition(homedPosition);
+            })
+        .finallyDo(
+            () -> {
+              closedLoop = true;
+            });
+  }
+
+  /** State class for static characterization. */
+  private static class StaticCharacterizationState {
+    public double characterizationVolts = 0.0;
+  }
+
+  /**
+   * Creates a command for static characterization that ramps voltage until motion is detected.
+   *
+   * @param voltageRampRateVoltsPerSec Rate at which to increase voltage (volts per second)
+   * @return Command that runs the characterization
+   */
+  public Command staticCharacterization(double voltageRampRateVoltsPerSec) {
+    final StaticCharacterizationState state = new StaticCharacterizationState();
+    Timer timer = new Timer();
+    return Commands.startRun(
+            () -> {
+              closedLoop = false;
+              timer.restart();
+            },
+            () -> {
+              state.characterizationVolts = voltageRampRateVoltsPerSec * timer.get();
+              System.out.println("Turret Voltage Ramp: " + state.characterizationVolts);
+              turretIO.runVolts(state.characterizationVolts);
+              Logger.recordOutput(
+                  "Turret/StaticCharacterizationVolts", state.characterizationVolts);
+            })
+        .until(
+            () -> Math.abs(inputs.velocityRadPerSec) >= staticCharacterizationVelocityThresh.get())
+        .finallyDo(
+            () -> {
+              closedLoop = true;
+              timer.stop();
+              turretIO.stop();
+              Logger.recordOutput(
+                  "Turret/CharacterizationResultVolts", state.characterizationVolts);
+            });
   }
 }

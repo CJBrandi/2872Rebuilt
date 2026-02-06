@@ -2,7 +2,6 @@ package frc.robot.subsystems.superstructure.shooter;
 
 import edu.wpi.first.math.*;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.math.system.NumericalIntegration;
@@ -19,7 +18,9 @@ public class HoodIOSim implements HoodIO {
 
   // Falcon 500 with reduction gearing
   private static final DCMotor GEARBOX =
-      DCMotor.getFalcon500(1).withReduction(Constants.ShooterConstants.hoodReduction);
+      DCMotor.getFalcon500(1)
+          .withReduction(
+              Constants.SuperstructureConstants.ShooterConstants.HoodConstants.reduction);
 
   // State-space model: [position, velocity]
   // dx/dt = A*x + B*u
@@ -62,10 +63,10 @@ public class HoodIOSim implements HoodIO {
 
     inputs.motorConnected = true;
     inputs.encoderConnected = true;
-    inputs.position = Rotation2d.fromRadians(simState.get(0));
+    inputs.positionRad = simState.get(0);
     inputs.velocityRadPerSec = simState.get(1);
     inputs.appliedVolts = appliedVolts;
-    inputs.currentAmps = Math.abs(inputTorqueCurrent);
+    inputs.torqueCurrentAmps = Math.abs(inputTorqueCurrent);
     inputs.tempCelsius = 0.0;
   }
 
@@ -76,20 +77,14 @@ public class HoodIOSim implements HoodIO {
   }
 
   @Override
-  public void runVolts(double volts) {
-    closedLoop = false;
-    setInputVoltage(volts);
-  }
-
-  @Override
   public void stop() {
     runOpenLoop(0.0);
   }
 
   @Override
-  public void runPosition(Rotation2d position, double feedforward) {
+  public void runPosition(double positionRad, double feedforward) {
     closedLoop = true;
-    controller.setSetpoint(position.getRadians());
+    controller.setSetpoint(positionRad);
     this.feedforward = feedforward;
   }
 

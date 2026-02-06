@@ -43,7 +43,8 @@ public class Intake extends SubsystemBase {
     if (closedLoop) {
       double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(50);
       atSetpoint =
-          EqualsUtil.epsilonEquals(inputs.velocityRadPerSec, targetVelocityRadPerSec.get(), toleranceRadPerSec);
+          EqualsUtil.epsilonEquals(
+              inputs.velocityRadPerSec, targetVelocityRadPerSec.get(), toleranceRadPerSec);
     } else {
       atSetpoint = false;
     }
@@ -57,7 +58,8 @@ public class Intake extends SubsystemBase {
         "Intake/Profile/ActualVelocityRPM",
         Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
     Logger.recordOutput(
-        "Intake/Profile/VelocityErrorRadPerSec", targetVelocityRadPerSec.get() - inputs.velocityRadPerSec);
+        "Intake/Profile/VelocityErrorRadPerSec",
+        targetVelocityRadPerSec.get() - inputs.velocityRadPerSec);
     Logger.recordOutput("Intake/ClosedLoop", closedLoop);
   }
 

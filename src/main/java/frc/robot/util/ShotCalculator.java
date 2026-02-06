@@ -15,7 +15,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import lombok.Getter;
 import lombok.Setter;
 import org.littletonrobotics.junction.Logger;
@@ -45,20 +44,14 @@ public class ShotCalculator {
   // Lookup tables keyed by distance (meters)
   private final InterpolatingDoubleTreeMap pitchAngleMap = new InterpolatingDoubleTreeMap();
   private final InterpolatingDoubleTreeMap exitVelocityMap = new InterpolatingDoubleTreeMap();
+  private final InterpolatingDoubleTreeMap flightTimeMap = new InterpolatingDoubleTreeMap();
 
-    @Getter
-    private double shooterHeight = 0.5;
-    @Getter
-    private double targetHeight = 1.75;
-    @Getter
-    @Setter
-    private Translation2d targetPosition = new Translation2d(4.6256194, 4.0346376);
-    @Getter
-    private double minDistance = Double.MAX_VALUE;
-    @Getter
-    private double maxDistance = 0;
-    @Getter
-    private boolean loaded = false;
+  @Getter private double shooterHeight = 0.5;
+  @Getter private double targetHeight = 1.75;
+  @Getter @Setter private Translation2d targetPosition = new Translation2d(4.6256194, 4.0346376);
+  @Getter private double minDistance = Double.MAX_VALUE;
+  @Getter private double maxDistance = 0;
+  @Getter private boolean loaded = false;
 
   // Filters for velocity calculation
   private final LinearFilter turretAngleFilter =
@@ -82,46 +75,41 @@ public class ShotCalculator {
 
   /** Loads the shot map from the deploy directory. */
   private void load() {
-    Path path = Filesystem.getDeployDirectory().toPath().resolve("trajectory_lookup.json");
+    Path path = Filesystem.getDeployDirectory().toPath().resolve("hub_lookup.json");
 
     try (BufferedReader reader = Files.newBufferedReader(path)) {
       Gson gson = new Gson();
       JsonObject root = gson.fromJson(reader, JsonObject.class);
 
-      shooterHeight = root.get("shooter_height").getAsDouble();
-      targetHeight = root.get("target_height").getAsDouble();
+      // Load config
+      JsonObject config = root.getAsJsonObject("config");
+      shooterHeight = config.get("shooter_height_m").getAsDouble();
+      targetHeight = config.get("target_height_m").getAsDouble();
 
-      // Load target position
-      JsonArray targetPosArray = root.getAsJsonArray("target_position");
-      targetPosition =
-          new Translation2d(
-              targetPosArray.get(0).getAsDouble(), targetPosArray.get(1).getAsDouble());
+      // Load entries array
+      JsonArray entriesJson = root.getAsJsonArray("entries");
+      int count = 0;
 
-      // Load distances array
-      JsonArray distancesJson = root.getAsJsonArray("distances");
-      JsonArray dataJson = root.getAsJsonArray("data");
+      for (int i = 0; i < entriesJson.size(); i++) {
+        JsonObject entry = entriesJson.get(i).getAsJsonObject();
+        double distance = entry.get("distance").getAsDouble();
+        double pitch = entry.get("pitch").getAsDouble();
+        double velocity = entry.get("velocity").getAsDouble();
+        double flightTime = entry.get("flight_time").getAsDouble();
 
-      for (int i = 0; i < distancesJson.size(); i++) {
-        double distance = distancesJson.get(i).getAsDouble();
-        JsonArray row = dataJson.get(i).getAsJsonArray();
+        pitchAngleMap.put(distance, pitch);
+        exitVelocityMap.put(distance, velocity);
+        flightTimeMap.put(distance, flightTime);
 
-        if (!row.get(0).isJsonNull()) {
-          JsonObject entry = row.get(0).getAsJsonObject();
-          double pitch = entry.get("pitch").getAsDouble();
-          double velocity = entry.get("velocity").getAsDouble();
-
-          pitchAngleMap.put(distance, pitch);
-          exitVelocityMap.put(distance, velocity);
-
-          minDistance = Math.min(minDistance, distance);
-          maxDistance = Math.max(maxDistance, distance);
-        }
+        minDistance = Math.min(minDistance, distance);
+        maxDistance = Math.max(maxDistance, distance);
+        count++;
       }
 
       loaded = true;
       System.out.println(
-          "ShotCalculator: Loaded trajectory lookup with "
-              + distancesJson.size()
+          "ShotCalculator: Loaded hub_lookup.json with "
+              + count
               + " entries ("
               + minDistance
               + "m - "
@@ -129,12 +117,11 @@ public class ShotCalculator {
               + "m)");
 
     } catch (IOException e) {
-      System.err.println(
-          "ShotCalculator: Failed to load trajectory_lookup.json: " + e.getMessage());
+      System.err.println("ShotCalculator: Failed to load hub_lookup.json: " + e.getMessage());
     }
   }
 
-    /**
+  /**
    * Calculates shot parameters for the current robot state.
    *
    * @return Shot parameters including turret angle, pitch angle, and exit velocity
@@ -159,11 +146,8 @@ public class ShotCalculator {
     // Clamp distance to table bounds
     double clampedDistance = Math.max(minDistance, Math.min(maxDistance, turretToTargetDistance));
 
-    // Estimate time of flight based on distance and exit velocity
-    double exitVelocity = exitVelocityMap.get(clampedDistance);
-    double pitchAngle = pitchAngleMap.get(clampedDistance);
-    double horizontalVelocity = exitVelocity * Math.cos(pitchAngle);
-    double timeOfFlight = clampedDistance / horizontalVelocity;
+    // Get time of flight from lookup table (more accurate than calculating)
+    double timeOfFlight = flightTimeMap.get(clampedDistance);
 
     // Calculate field relative turret velocity
     double robotAngle = robotPose.getRotation().getRadians();
@@ -191,9 +175,15 @@ public class ShotCalculator {
     // Calculate turret angle to target
     Rotation2d turretAngle = targetPosition.minus(lookaheadPose.getTranslation()).getAngle();
 
+    // Normalize angle to [0, 2π) to avoid wrapping issues
+    double angleRad = turretAngle.getRadians();
+    while (angleRad < 0) angleRad += 2 * Math.PI;
+    while (angleRad >= 2 * Math.PI) angleRad -= 2 * Math.PI;
+    turretAngle = new Rotation2d(angleRad);
+
     // Get parameters for compensated distance
-    pitchAngle = pitchAngleMap.get(lookaheadDistance);
-    exitVelocity = exitVelocityMap.get(lookaheadDistance);
+    double pitchAngle = pitchAngleMap.get(lookaheadDistance);
+    double exitVelocity = exitVelocityMap.get(lookaheadDistance);
 
     // Calculate velocities using filters
     if (lastTurretAngle == null) lastTurretAngle = turretAngle;
@@ -225,5 +215,4 @@ public class ShotCalculator {
   public void clearShootingParameters() {
     latestParameters = null;
   }
-
 }

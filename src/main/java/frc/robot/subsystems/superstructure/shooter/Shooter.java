@@ -1,5 +1,8 @@
 package frc.robot.subsystems.superstructure.shooter;
 
+import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.util.LoggedTunableNumber;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -10,6 +13,14 @@ import org.littletonrobotics.junction.Logger;
  */
 @Getter
 public class Shooter {
+
+  // Manual mode tunable numbers
+  private static final LoggedTunableNumber manualModeEnabled =
+      new LoggedTunableNumber("Shooter/Manual/Enabled", 1.0);
+  private static final LoggedTunableNumber manualFlywheelRPM =
+      new LoggedTunableNumber("Shooter/Manual/FlywheelRPM", 3000.0);
+  private static final LoggedTunableNumber manualHoodAngleDeg =
+      new LoggedTunableNumber("Shooter/Manual/HoodAngleDeg", 45.0);
 
   /** -- GETTER -- Returns the flywheel component for direct access if needed. */
   private final Flywheel flywheel;
@@ -27,15 +38,28 @@ public class Shooter {
   }
 
   public void periodic() {
-    // Update flywheel and hood
+    // Apply goals to components BEFORE running periodic control loops
+    // This ensures the correct mode/targets are set before control runs
+    if (manualModeEnabled.get() > 0.5) {
+      // Manual mode: use tunable RPM and angle values with closed-loop control
+      double manualVelocityRadPerSec =
+          Units.rotationsPerMinuteToRadiansPerSecond(manualFlywheelRPM.get());
+      flywheel.runWheelVelocity(manualVelocityRadPerSec);
+      hood.setTargetAngle(Math.toRadians(manualHoodAngleDeg.get()), 0.0);
+    } else {
+      // Normal mode: use goals from Superstructure
+      flywheel.setTargetExitVelocity(goalExitVelocityMps);
+      hood.setTargetAngle(goalHoodAngleRad, goalHoodVelocityRadPerSec);
+    }
+
+    // Run control loops after targets are set
     flywheel.periodic();
     hood.periodic();
 
-    // Apply goals to components
-    flywheel.setTargetExitVelocity(goalExitVelocityMps);
-    hood.setTargetAngle(goalHoodAngleRad, goalHoodVelocityRadPerSec);
-
     // Log goal values
+    Logger.recordOutput("Shooter/ManualMode", manualModeEnabled.get() > 0.5);
+    Logger.recordOutput("Shooter/Manual/FlywheelRPM", manualFlywheelRPM.get());
+    Logger.recordOutput("Shooter/Manual/HoodAngleDeg", manualHoodAngleDeg.get());
     Logger.recordOutput("Shooter/GoalExitVelocityMps", goalExitVelocityMps);
     Logger.recordOutput("Shooter/GoalHoodAngleRad", goalHoodAngleRad);
     Logger.recordOutput("Shooter/GoalHoodAngleDeg", Math.toDegrees(goalHoodAngleRad));
@@ -100,16 +124,36 @@ public class Shooter {
     flywheel.runVolts(volts);
   }
 
-  /** Runs hood at specified voltage (bypasses goal system). */
-  public void runHoodVolts(double volts) {
-    goalHoodAngleRad = hood.getAngle().getRadians();
-    hood.runVolts(volts);
-  }
-
   /** Stops all motors (sets goals to zero/min positions). */
   public void stop() {
     goalExitVelocityMps = 0.0;
     goalHoodAngleRad = Hood.getMinAngleRad();
     goalHoodVelocityRadPerSec = 0.0;
+  }
+
+  // ==================== Hood Commands ====================
+
+  /**
+   * Creates a command for hood homing sequence.
+   *
+   * @return Command that homes the hood by running into the hard stop
+   */
+  public Command hoodHomingCommand() {
+    return hood.homingSequence();
+  }
+
+  /**
+   * Creates a command for hood static characterization.
+   *
+   * @param currentRampRateAmpsPerSec Rate at which to increase current (amps per second)
+   * @return Command that runs the characterization
+   */
+  public Command hoodStaticCharacterizationCommand(double currentRampRateAmpsPerSec) {
+    return hood.staticCharacterization(currentRampRateAmpsPerSec);
+  }
+
+  /** Returns whether the hood has been homed. */
+  public boolean isHoodHomed() {
+    return hood.isHomed();
   }
 }

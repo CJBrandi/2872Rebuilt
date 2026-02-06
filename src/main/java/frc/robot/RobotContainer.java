@@ -11,6 +11,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -26,6 +27,7 @@ import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
 import frc.robot.subsystems.superstructure.Superstructure;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
+import frc.robot.subsystems.superstructure.indexer.IndexerIOSim;
 import frc.robot.subsystems.superstructure.shooter.FlywheelIO;
 import frc.robot.subsystems.superstructure.shooter.FlywheelIOSim;
 import frc.robot.subsystems.superstructure.shooter.FlywheelIOSparkFlex;
@@ -49,10 +51,14 @@ public class RobotContainer {
   // Subsystems
   private final Drive drive;
   private final Superstructure superstructure;
-
-  private final Intake intake;
+  private final Elevator elevator;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
+
+  // Shooting toggle state
+  private boolean continuousShootingEnabled = false;
+  private static final double SHOT_PERIOD_SECONDS = 1.0 / 15.0; // 15 balls/second
+  private double lastShotTime = 0.0;
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -72,14 +78,18 @@ public class RobotContainer {
         superstructure =
             new Superstructure(
                 new Shooter(
-                    new FlywheelIOSparkFlex(Constants.ShooterConstants.flywheelCanId),
+                    new FlywheelIOSparkFlex(
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId),
                     new HoodIOTalonFX(
-                        Constants.ShooterConstants.hoodCanId,
-                        Constants.ShooterConstants.hoodCanBus)),
+                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
+                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus)),
                 new Turret(
                     new TurretIOTalonFX(
-                        Constants.TurretConstants.canId, Constants.TurretConstants.canBus)),
-                new Indexer());
+                        Constants.SuperstructureConstants.TurretConstants.canId,
+                        Constants.SuperstructureConstants.TurretConstants.canBus)),
+                new Indexer(new IndexerIOSim()));
+
+        elevator = new Elevator(new ElevatorIOKraken());
 
         break;
 
@@ -97,7 +107,9 @@ public class RobotContainer {
             new Superstructure(
                 new Shooter(new FlywheelIOSim(), new HoodIOSim()),
                 new Turret(new TurretIOSim()),
-                new Indexer());
+                new Indexer(new IndexerIOSim()));
+
+        elevator = new Elevator(new ElevatorIOSim());
         break;
 
       default:
@@ -114,8 +126,38 @@ public class RobotContainer {
             new Superstructure(
                 new Shooter(new FlywheelIO() {}, new HoodIO() {}),
                 new Turret(new TurretIO() {}),
-                new Indexer());
+                new Indexer(new IndexerIOSim()));
+
+        elevator = new Elevator(new ElevatorIO() {});
         break;
+    }
+
+    // Initialize FuelSim in simulation mode
+    if (Constants.currentMode == Constants.Mode.SIM) {
+      FuelSim fuelSim = FuelSim.getInstance();
+
+      // Register robot for collision detection
+      fuelSim.registerRobot(
+          Constants.RobotDimensions.width,
+          Constants.RobotDimensions.length,
+          Constants.RobotDimensions.bumperHeight,
+          drive::getPose,
+          () -> RobotState.getInstance().getRobotVelocity());
+
+      // Register intake bounding box
+      fuelSim.registerIntake(
+          Constants.IntakeBounds.xMin,
+          Constants.IntakeBounds.xMax,
+          Constants.IntakeBounds.yMin,
+          Constants.IntakeBounds.yMax,
+          () -> true); // TODO: wire to actual intake running state
+
+      // Enable air resistance for more realistic physics
+      fuelSim.enableAirResistance();
+
+      // Spawn starting fuel and start simulation
+      fuelSim.spawnStartingFuel();
+      fuelSim.start();
     }
 
     // Set up auto routines
@@ -136,6 +178,17 @@ public class RobotContainer {
         "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
     autoChooser.addOption(
         "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
+    autoChooser.addOption("Elevator Static Characterization", elevator.staticCharacterization(2));
+    autoChooser.addOption("Elevator Homing", elevator.homingSequence());
+
+    // Hood characterization/homing routines
+    autoChooser.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
+    autoChooser.addOption(
+        "Hood Static Characterization",
+        superstructure.getShooter().hoodStaticCharacterizationCommand(-2));
+
+    autoChooser.addOption(
+        "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
 
     // Configure the button bindings
     configureButtonBindings();
@@ -158,19 +211,28 @@ public class RobotContainer {
 
     // Lock to 0° when A button is held
     controller
-        .a()
-        .whileTrue(
-            DriveCommands.joystickDriveAtAngle(
-                drive,
-                () -> -controller.getLeftY(),
-                () -> -controller.getLeftX(),
-                () -> Rotation2d.kZero));
+        .x()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  continuousShootingEnabled = !continuousShootingEnabled;
+                }));
 
-    // Switch to X pattern when X button is pressed
-    // controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
-    controller.x().whileTrue(Commands.run(() -> indexer.runVolts(6.0), indexer));
+    // Run continuous shooting command with rate limiting
+    superstructure.setDefaultCommand(
+        Commands.run(
+            () -> {
+              if (continuousShootingEnabled) {
+                double currentTime = Timer.getFPGATimestamp();
+                if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
+                  superstructure.launchFuelSim();
+                  lastShotTime = currentTime;
+                }
+              }
+            },
+            superstructure));
 
-    // Reset gyro to 0° when B button is pressed
+    // Reset gyro to 0° when B button is pressed
     controller
         .b()
         .onTrue(
@@ -180,6 +242,11 @@ public class RobotContainer {
                             new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
                     drive)
                 .ignoringDisable(true));
+
+    // Elevator target control with POV
+    controller.pov(0).onTrue(elevator.setTarget(Elevator.Target.UP));
+    controller.pov(90).onTrue(elevator.setTarget(Elevator.Target.TRANSITION));
+    controller.pov(180).onTrue(elevator.setTarget(Elevator.Target.DOWN));
   }
 
   /**

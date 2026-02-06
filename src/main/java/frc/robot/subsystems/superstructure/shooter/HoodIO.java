@@ -1,6 +1,5 @@
 package frc.robot.subsystems.superstructure.shooter;
 
-import edu.wpi.first.math.geometry.Rotation2d;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface HoodIO {
@@ -9,10 +8,11 @@ public interface HoodIO {
     public boolean motorConnected = true;
     public boolean encoderConnected = true;
 
-    public Rotation2d position = new Rotation2d();
+    public double positionRad = 0.0;
     public double velocityRadPerSec = 0.0;
     public double appliedVolts = 0.0;
-    public double currentAmps = 0.0;
+    public double torqueCurrentAmps = 0.0;
+    public double supplyCurrentAmps = 0.0;
     public double tempCelsius = 0.0;
   }
 
@@ -20,11 +20,11 @@ public interface HoodIO {
 
   default void runOpenLoop(double output) {}
 
-  default void runVolts(double volts) {}
-
   default void stop() {}
 
-  default void runPosition(Rotation2d position, double feedforward) {}
+  default void runVolts(double volts) {}
+
+  default void runPosition(double positionRad, double feedforward) {}
 
   default void setPID(double kP, double kI, double kD) {}
 

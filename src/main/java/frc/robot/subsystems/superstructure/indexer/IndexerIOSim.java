@@ -11,7 +11,8 @@ public class IndexerIOSim implements IndexerIO {
   private static final double moi = 0.003;
 
   private static final DCMotor gearbox =
-      DCMotor.getKrakenX60Foc(1).withReduction(Constants.IndexerConstants.reduction);
+      DCMotor.getKrakenX60Foc(1)
+          .withReduction(Constants.SuperstructureConstants.IndexerConstants.reduction);
 
   private static final Matrix<N1, N1> A =
       MatBuilder.fill(

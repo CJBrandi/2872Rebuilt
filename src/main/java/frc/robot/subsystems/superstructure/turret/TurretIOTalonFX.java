@@ -18,17 +18,22 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
+import edu.wpi.first.wpilibj.DigitalInput;
 import frc.robot.Constants;
 
 /** Turret IO implementation using TalonFX (Kraken X60). */
 public class TurretIOTalonFX implements TurretIO {
-  private static final double GEAR_RATIO = Constants.TurretConstants.reduction;
+  private static final double GEAR_RATIO =
+      Constants.SuperstructureConstants.TurretConstants.reduction;
 
   // Turret limits in mechanism rotations
   private static final double MIN_ANGLE_ROTATIONS = 0.0;
   private static final double MAX_ANGLE_ROTATIONS = Units.radiansToRotations((3 * Math.PI) / 2);
 
   private final TalonFX talon;
+  DigitalInput leftHall = new DigitalInput(0);
+  DigitalInput middleHall = new DigitalInput(1);
+  DigitalInput rightHall = new DigitalInput(2);
 
   // Control requests
   private final VoltageOut voltageRequest = new VoltageOut(0.0);
@@ -42,10 +47,6 @@ public class TurretIOTalonFX implements TurretIO {
   private final StatusSignal<Temperature> temperature;
 
   private final Debouncer connectedDebouncer = new Debouncer(0.5, Debouncer.DebounceType.kFalling);
-
-  public TurretIOTalonFX(int canId) {
-    this(canId, "");
-  }
 
   public TurretIOTalonFX(int canId, String canBus) {
     talon = new TalonFX(canId, canBus);
@@ -71,11 +72,9 @@ public class TurretIOTalonFX implements TurretIO {
     config.Slot0.kS = 0.0;
     config.Slot0.kV = 0.0;
 
-    // Soft limits
-    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
-    config.SoftwareLimitSwitch.ForwardSoftLimitThreshold = MAX_ANGLE_ROTATIONS;
-    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
-    config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = MIN_ANGLE_ROTATIONS;
+    // Disable soft limits - turret uses continuous rotation with wrap-around logic
+    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
+    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
 
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 
@@ -96,6 +95,10 @@ public class TurretIOTalonFX implements TurretIO {
   public void updateInputs(TurretIOInputs inputs) {
     var status =
         BaseStatusSignal.refreshAll(position, velocity, appliedVolts, current, temperature);
+
+    inputs.hallEffectState[0] = leftHall.get();
+    inputs.hallEffectState[1] = middleHall.get();
+    inputs.hallEffectState[2] = rightHall.get();
 
     inputs.motorConnected = connectedDebouncer.calculate(status.isOK());
     inputs.encoderConnected = inputs.motorConnected;
@@ -129,18 +132,20 @@ public class TurretIOTalonFX implements TurretIO {
 
   @Override
   public void setPID(double kP, double kI, double kD) {
-    TalonFXConfiguration config = new TalonFXConfiguration();
-    config.Slot0.kP = kP;
-    config.Slot0.kI = kI;
-    config.Slot0.kD = kD;
-    talon.getConfigurator().apply(config);
+    var slot0Config = new com.ctre.phoenix6.configs.Slot0Configs();
+    talon.getConfigurator().refresh(slot0Config);
+    slot0Config.kP = kP;
+    slot0Config.kI = kI;
+    slot0Config.kD = kD;
+    talon.getConfigurator().apply(slot0Config);
   }
 
   @Override
   public void setBrakeMode(boolean enabled) {
-    TalonFXConfiguration config = new TalonFXConfiguration();
-    config.MotorOutput.NeutralMode = enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-    talon.getConfigurator().apply(config);
+    var motorOutputConfig = new com.ctre.phoenix6.configs.MotorOutputConfigs();
+    talon.getConfigurator().refresh(motorOutputConfig);
+    motorOutputConfig.NeutralMode = enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+    talon.getConfigurator().apply(motorOutputConfig);
   }
 
   @Override
