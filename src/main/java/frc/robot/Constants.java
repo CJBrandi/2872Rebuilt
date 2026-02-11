@@ -74,7 +74,7 @@ public final class Constants {
   public static class SuperstructureConstants {
     public static class TurretConstants {
       public static final int canId = 60;
-      public static final String canBus = "";
+      public static final String canBus = "*";
       public static final double reduction = 40.66;
 
       public static class HallEffectDegrees {
@@ -87,13 +87,13 @@ public final class Constants {
     public static class ShooterConstants {
       public static class FlywheelConstants {
         public static final int canId = 51;
-        public static final String canBus = "";
+        public static final String canBus = "*";
         public static final double stepUp = 1.0;
       }
 
       public static class HoodConstants {
         public static final int canId = 52;
-        public static final String canBus = "";
+        public static final String canBus = "*";
         public static final double reduction = 6.0;
       }
     }

@@ -54,7 +54,7 @@ public class TurretIOTalonFX implements TurretIO {
     // Configure motor
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-    config.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+    config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
 
     // Gear ratio: motor rotations to mechanism rotations
     config.Feedback.SensorToMechanismRatio = GEAR_RATIO;

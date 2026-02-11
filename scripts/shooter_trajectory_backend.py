@@ -330,13 +330,13 @@ def solve_trajectory(
     return result
 
 
-def velocity_to_rpm(velocity_mps: float, wheel_radius: float = 0.075) -> float:
+def velocity_to_rpm(velocity_mps: float, wheel_radius: float = 2.0 * 0.0254) -> float:
     """
     Convert ball exit velocity to wheel RPM.
 
     Args:
         velocity_mps: Ball exit velocity in m/s
-        wheel_radius: Wheel radius in meters (default: 75mm = 0.075m)
+        wheel_radius: Wheel radius in meters (default: 2 inches = 0.0508m)
 
     Returns:
         Wheel RPM
@@ -345,13 +345,13 @@ def velocity_to_rpm(velocity_mps: float, wheel_radius: float = 0.075) -> float:
     return angular_velocity * 60 / (2 * math.pi)
 
 
-def rpm_to_velocity(rpm: float, wheel_radius: float = 0.075) -> float:
+def rpm_to_velocity(rpm: float, wheel_radius: float = 2.0 * 0.0254) -> float:
     """
     Convert wheel RPM to ball exit velocity.
 
     Args:
         rpm: Wheel RPM
-        wheel_radius: Wheel radius in meters (default: 75mm = 0.075m)
+        wheel_radius: Wheel radius in meters (default: 2 inches = 0.0508m)
 
     Returns:
         Ball exit velocity in m/s

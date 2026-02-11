@@ -7,6 +7,8 @@
 
 package frc.robot;
 
+import static frc.robot.subsystems.vision.VisionConstants.*;
+
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -19,26 +21,24 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
-import frc.robot.subsystems.drive.Drive;
-import frc.robot.subsystems.drive.GyroIO;
-import frc.robot.subsystems.drive.GyroIOPigeon2;
-import frc.robot.subsystems.drive.ModuleIO;
-import frc.robot.subsystems.drive.ModuleIOSim;
-import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.drive.*;
+import frc.robot.subsystems.elevator.Elevator;
+import frc.robot.subsystems.elevator.ElevatorIO;
+import frc.robot.subsystems.elevator.ElevatorIOKraken;
+import frc.robot.subsystems.elevator.ElevatorIOSim;
 import frc.robot.subsystems.superstructure.Superstructure;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
 import frc.robot.subsystems.superstructure.indexer.IndexerIOSim;
-import frc.robot.subsystems.superstructure.shooter.FlywheelIO;
-import frc.robot.subsystems.superstructure.shooter.FlywheelIOSim;
-import frc.robot.subsystems.superstructure.shooter.FlywheelIOSparkFlex;
-import frc.robot.subsystems.superstructure.shooter.HoodIO;
-import frc.robot.subsystems.superstructure.shooter.HoodIOSim;
-import frc.robot.subsystems.superstructure.shooter.HoodIOTalonFX;
-import frc.robot.subsystems.superstructure.shooter.Shooter;
+import frc.robot.subsystems.superstructure.shooter.*;
 import frc.robot.subsystems.superstructure.turret.Turret;
 import frc.robot.subsystems.superstructure.turret.TurretIO;
 import frc.robot.subsystems.superstructure.turret.TurretIOSim;
 import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
+import frc.robot.subsystems.vision.Vision;
+import frc.robot.subsystems.vision.VisionIO;
+import frc.robot.subsystems.vision.VisionIOPhotonVision;
+import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import frc.robot.util.FuelSim;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -52,6 +52,7 @@ public class RobotContainer {
   private final Drive drive;
   private final Superstructure superstructure;
   private final Elevator elevator;
+  private Vision vision;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
@@ -69,17 +70,19 @@ public class RobotContainer {
       case REAL:
         drive =
             new Drive(
-                new GyroIOPigeon2(),
-                new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                new ModuleIOTalonFX(TunerConstants.FrontRight),
-                new ModuleIOTalonFX(TunerConstants.BackLeft),
-                new ModuleIOTalonFX(TunerConstants.BackRight));
+                new GyroIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {});
 
         superstructure =
             new Superstructure(
                 new Shooter(
-                    new FlywheelIOSparkFlex(
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId),
+                    new FlywheelIOTalonFX(
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
+                            .canBus),
                     new HoodIOTalonFX(
                         Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
                         Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus)),
@@ -90,6 +93,10 @@ public class RobotContainer {
                 new Indexer(new IndexerIOSim()));
 
         elevator = new Elevator(new ElevatorIOKraken());
+
+        vision =
+            new Vision(
+                drive::addVisionMeasurement, new VisionIOPhotonVision(camera0Name, robotToCamera0));
 
         break;
 
@@ -110,6 +117,12 @@ public class RobotContainer {
                 new Indexer(new IndexerIOSim()));
 
         elevator = new Elevator(new ElevatorIOSim());
+
+        vision =
+            new Vision(
+                drive::addVisionMeasurement,
+                new VisionIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
+                new VisionIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
         break;
 
       default:
@@ -129,6 +142,8 @@ public class RobotContainer {
                 new Indexer(new IndexerIOSim()));
 
         elevator = new Elevator(new ElevatorIO() {});
+
+        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         break;
     }
 
@@ -190,6 +205,15 @@ public class RobotContainer {
     autoChooser.addOption(
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
 
+    // Hood characterization/homing routines
+    autoChooser.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
+    autoChooser.addOption(
+        "Hood Static Characterization",
+        superstructure.getShooter().hoodStaticCharacterizationCommand(-2));
+
+    autoChooser.addOption(
+        "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
+
     // Configure the button bindings
     configureButtonBindings();
   }
@@ -209,7 +233,7 @@ public class RobotContainer {
             () -> -controller.getLeftX(),
             () -> -controller.getRightX()));
 
-    // Lock to 0° when A button is held
+    // Toggle continuous shooting with X button
     controller
         .x()
         .onTrue(

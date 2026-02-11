@@ -28,9 +28,6 @@ public class Superstructure extends SubsystemBase {
 
   @Override
   public void periodic() {
-    // Clear cached shot parameters at start of each loop
-    shotCalculator.clearShootingParameters();
-
     // Get shooting parameters from calculator
     var params = shotCalculator.getParameters();
 

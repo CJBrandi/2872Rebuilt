@@ -2,11 +2,14 @@ package frc.robot;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import frc.robot.util.FieldConstants;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import lombok.Getter;
 import lombok.Setter;
+import org.littletonrobotics.junction.Logger;
 
 public class RobotState {
   @Getter private static RobotState instance = new RobotState();
@@ -48,5 +51,12 @@ public class RobotState {
     // Interpolate between floor and ceiling
     double t = (timestamp - floor.getKey()) / (ceiling.getKey() - floor.getKey());
     return floor.getValue().interpolate(ceiling.getValue(), t);
+  }
+
+  public void periodic() {
+    // Calculate horizontal distance from robot to HUB
+    Translation3d hubCenter = FieldConstants.Hub.topCenterPoint.get();
+    double horizontalDistance = robotPose.getTranslation().getDistance(hubCenter.toTranslation2d());
+    Logger.recordOutput("RobotState/HubDistanceMeters", horizontalDistance);
   }
 }

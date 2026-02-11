@@ -14,13 +14,13 @@ import org.littletonrobotics.junction.Logger;
 @Getter
 public class Shooter {
 
-  // Manual mode tunable numbers
+  // Manual mode tunable numbers (shared with Turret via same NT key)
   private static final LoggedTunableNumber manualModeEnabled =
-      new LoggedTunableNumber("Shooter/Manual/Enabled", 1.0);
+      new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber manualFlywheelRPM =
-      new LoggedTunableNumber("Shooter/Manual/FlywheelRPM", 3000.0);
+      new LoggedTunableNumber("Manual/FlywheelRPM", 3000.0);
   private static final LoggedTunableNumber manualHoodAngleDeg =
-      new LoggedTunableNumber("Shooter/Manual/HoodAngleDeg", 45.0);
+      new LoggedTunableNumber("Manual/PitchDeg", 45.0);
 
   /** -- GETTER -- Returns the flywheel component for direct access if needed. */
   private final Flywheel flywheel;
@@ -49,7 +49,7 @@ public class Shooter {
     } else {
       // Normal mode: use goals from Superstructure
       flywheel.setTargetExitVelocity(goalExitVelocityMps);
-      hood.setTargetAngle(goalHoodAngleRad, goalHoodVelocityRadPerSec);
+      hood.setTargetAngle(Math.toRadians(90) - goalHoodAngleRad, goalHoodVelocityRadPerSec);
     }
 
     // Run control loops after targets are set

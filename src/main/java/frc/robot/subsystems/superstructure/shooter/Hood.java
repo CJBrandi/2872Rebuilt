@@ -32,9 +32,9 @@ public class Hood {
   private static final LoggedTunableNumber kG = new LoggedTunableNumber("Shooter/Hood/kG", 3.0);
 
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Shooter/Hood/MaxVelocityDegPerSec", 200.0);
+      new LoggedTunableNumber("Shooter/Hood/MaxVelocityDegPerSec", 90);
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Shooter/Hood/MaxAccelerationDegPerSec2", 400.0);
+      new LoggedTunableNumber("Shooter/Hood/MaxAccelerationDegPerSec2", 180);
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Shooter/Hood/StaticCharacterizationVelocityThreshRadPerSec", 0.1);
 

@@ -38,9 +38,9 @@ public class Turret {
 
   // Manual mode tunables
   private static final LoggedTunableNumber manualModeEnabled =
-      new LoggedTunableNumber("Turret/ManualModeEnabled", 0.0);
+      new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber manualAngleDeg =
-      new LoggedTunableNumber("Turret/ManualAngleDeg", 0.0);
+      new LoggedTunableNumber("Manual/YawDeg", 0.0);
 
   private final TurretIO turretIO;
   private final TurretIOInputsAutoLogged inputs = new TurretIOInputsAutoLogged();

@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.Getter;
-import lombok.Setter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -25,6 +24,8 @@ import org.littletonrobotics.junction.Logger;
  */
 public class ShotCalculator {
   private static final double LOOP_PERIOD_SECS = 0.02; // 20ms
+  private static final int MAX_TOF_ITERATIONS = 5;
+  private static final double TOF_CONVERGENCE_THRESHOLD = 0.001; // meters
 
   private static ShotCalculator instance;
 
@@ -48,7 +49,6 @@ public class ShotCalculator {
 
   @Getter private double shooterHeight = 0.5;
   @Getter private double targetHeight = 1.75;
-  @Getter @Setter private Translation2d targetPosition = new Translation2d(4.6256194, 4.0346376);
   @Getter private double minDistance = Double.MAX_VALUE;
   @Getter private double maxDistance = 0;
   @Getter private boolean loaded = false;
@@ -62,9 +62,6 @@ public class ShotCalculator {
   // State for velocity calculation
   private Rotation2d lastTurretAngle = null;
   private double lastPitchAngle = Double.NaN;
-
-  // Cache parameters
-  private ShootingParameters latestParameters = null;
 
   // Robot to turret offset (adjust for your robot)
   private final Translation2d robotToTurret = new Translation2d(0, 0);
@@ -122,58 +119,59 @@ public class ShotCalculator {
   }
 
   /**
-   * Calculates shot parameters for the current robot state.
+   * Calculates shot parameters for the current robot state using time-of-flight recursion for
+   * accurate moving-while-shooting compensation.
    *
    * @return Shot parameters including turret angle, pitch angle, and exit velocity
    */
   public ShootingParameters getParameters() {
-    if (latestParameters != null) {
-      return latestParameters;
-    }
-
     // Get robot state
     Pose2d robotPose = RobotState.getInstance().getRobotPose();
     ChassisSpeeds robotVelocity = RobotState.getInstance().getRobotVelocity();
 
+    // Get alliance-aware target position from FieldConstants
+    Translation2d targetPosition = FieldConstants.Hub.topCenterPoint.get().toTranslation2d();
+
     // Calculate turret position in field coordinates
-    Pose2d turretPosition =
-        robotPose.transformBy(
-            new edu.wpi.first.math.geometry.Transform2d(robotToTurret, new Rotation2d()));
+    Translation2d turretPosition =
+        robotPose.getTranslation().plus(robotToTurret.rotateBy(robotPose.getRotation()));
 
-    // Calculate distance from turret to target
-    double turretToTargetDistance = targetPosition.getDistance(turretPosition.getTranslation());
-
-    // Clamp distance to table bounds
-    double clampedDistance = Math.max(minDistance, Math.min(maxDistance, turretToTargetDistance));
-
-    // Get time of flight from lookup table (more accurate than calculating)
-    double timeOfFlight = flightTimeMap.get(clampedDistance);
-
-    // Calculate field relative turret velocity
-    double robotAngle = robotPose.getRotation().getRadians();
+    // Field-relative turret velocity (robot velocity + tangential from rotation)
     double turretVelocityX =
         robotVelocity.vxMetersPerSecond
-            + robotVelocity.omegaRadiansPerSecond
-                * (robotToTurret.getY() * Math.cos(robotAngle)
-                    - robotToTurret.getX() * Math.sin(robotAngle));
+            - robotVelocity.omegaRadiansPerSecond
+                * robotToTurret.rotateBy(robotPose.getRotation()).getY();
     double turretVelocityY =
         robotVelocity.vyMetersPerSecond
             + robotVelocity.omegaRadiansPerSecond
-                * (robotToTurret.getX() * Math.cos(robotAngle)
-                    - robotToTurret.getY() * Math.sin(robotAngle));
+                * robotToTurret.rotateBy(robotPose.getRotation()).getX();
 
-    // Account for imparted velocity by robot (turret) to offset
-    double offsetX = turretVelocityX * timeOfFlight;
-    double offsetY = turretVelocityY * timeOfFlight;
-    Pose2d lookaheadPose =
-        new Pose2d(
-            turretPosition.getTranslation().plus(new Translation2d(offsetX, offsetY)),
-            turretPosition.getRotation());
-    double lookaheadDistance = targetPosition.getDistance(lookaheadPose.getTranslation());
-    lookaheadDistance = Math.max(minDistance, Math.min(maxDistance, lookaheadDistance));
+    // Time-of-flight recursion: iterate until distance converges
+    double distance = targetPosition.getDistance(turretPosition);
+    Translation2d compensatedPosition = turretPosition;
+    int iterations = 0;
 
-    // Calculate turret angle to target
-    Rotation2d turretAngle = targetPosition.minus(lookaheadPose.getTranslation()).getAngle();
+    for (int i = 0; i < MAX_TOF_ITERATIONS; i++) {
+      double clampedDistance = Math.max(minDistance, Math.min(maxDistance, distance));
+      double tof = flightTimeMap.get(clampedDistance);
+
+      Translation2d offset = new Translation2d(turretVelocityX * tof, turretVelocityY * tof);
+      compensatedPosition = turretPosition.plus(offset);
+
+      double newDistance = targetPosition.getDistance(compensatedPosition);
+      iterations = i + 1;
+
+      if (Math.abs(newDistance - distance) < TOF_CONVERGENCE_THRESHOLD) {
+        break;
+      }
+      distance = newDistance;
+    }
+
+    // Clamp final distance for lookup
+    double lookaheadDistance = Math.max(minDistance, Math.min(maxDistance, distance));
+
+    // Calculate turret angle to compensated target position
+    Rotation2d turretAngle = targetPosition.minus(compensatedPosition).getAngle();
 
     // Normalize angle to [0, 2π) to avoid wrapping issues
     double angleRad = turretAngle.getRadians();
@@ -198,21 +196,15 @@ public class ShotCalculator {
     lastTurretAngle = turretAngle;
     lastPitchAngle = pitchAngle;
 
-    latestParameters =
-        new ShootingParameters(
-            turretAngle, turretVelocity, pitchAngle, pitchVelocity, exitVelocity);
-
     // Log calculated values
-    Logger.recordOutput("ShotCalculator/LookaheadPose", lookaheadPose);
+    Logger.recordOutput(
+        "ShotCalculator/CompensatedPosition", new Pose2d(compensatedPosition, turretAngle));
     Logger.recordOutput("ShotCalculator/TurretToTargetDistance", lookaheadDistance);
+    Logger.recordOutput("ShotCalculator/ToFIterations", iterations);
     Logger.recordOutput("ShotCalculator/PitchAngleDeg", Math.toDegrees(pitchAngle));
     Logger.recordOutput("ShotCalculator/ExitVelocity", exitVelocity);
 
-    return latestParameters;
-  }
-
-  /** Clears the cached shooting parameters. Call this each loop iteration. */
-  public void clearShootingParameters() {
-    latestParameters = null;
+    return new ShootingParameters(
+        turretAngle, turretVelocity, pitchAngle, pitchVelocity, exitVelocity);
   }
 }

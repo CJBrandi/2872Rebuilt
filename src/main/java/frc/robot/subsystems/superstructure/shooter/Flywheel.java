@@ -13,8 +13,8 @@ import org.littletonrobotics.junction.Logger;
  */
 public class Flywheel {
 
-  // Wheel radius in meters (4 inch wheels)
-  private static final double WHEEL_RADIUS = Units.inchesToMeters(4.0);
+  // Wheel radius in meters (4 inch diameter wheels)
+  private static final double WHEEL_RADIUS = Units.inchesToMeters(2.0);
 
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Flywheel/kP", 3.0);
   private static final LoggedTunableNumber kI = new LoggedTunableNumber("Shooter/Flywheel/kI", 0.0);
@@ -27,7 +27,7 @@ public class Flywheel {
   // Efficiency coefficient: accounts for friction between wheels and ball
   // exitVelocity = wheelSurfaceVelocity * efficiency
   private static final LoggedTunableNumber efficiency =
-      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.657);
+      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.62);
 
   // Slew rate limiter parameters (rad/s per second)
   private static final LoggedTunableNumber maxAccelRadPerSec2 =
@@ -44,7 +44,7 @@ public class Flywheel {
   private double targetWheelVelocityRadPerSec = 0.0;
   private double velocitySetpointRadPerSec = 0.0;
   private boolean closedLoop = false;
-  private boolean directWheelVelocity = false; // true when using runWheelVelocity directly
+  private boolean directWheelVelocity = false;
 
   @Getter private boolean atSetpoint = false;
 
@@ -77,15 +77,10 @@ public class Flywheel {
 
     // Run velocity control if in closed loop mode
     if (closedLoop) {
-      // Convert exit velocity to wheel velocity accounting for efficiency
-      // Skip conversion if using direct wheel velocity control
+      // Only convert from exit velocity if not using direct wheel velocity
       if (!directWheelVelocity) {
-        if (targetExitVelocityMps > 0.0) {
-          double wheelSurfaceVelocityMps = targetExitVelocityMps / efficiency.get();
-          targetWheelVelocityRadPerSec = wheelSurfaceVelocityMps / WHEEL_RADIUS;
-        } else {
-          targetWheelVelocityRadPerSec = 0.0;
-        }
+        double wheelSurfaceVelocityMps = targetExitVelocityMps / efficiency.get();
+        targetWheelVelocityRadPerSec = wheelSurfaceVelocityMps / WHEEL_RADIUS;
       }
 
       // Apply slew rate limiting
@@ -132,7 +127,6 @@ public class Flywheel {
   public void runWheelVelocity(double velocityRadPerSec) {
     closedLoop = true;
     directWheelVelocity = true;
-    targetExitVelocityMps = 0.0;
     targetWheelVelocityRadPerSec = velocityRadPerSec;
   }
 
