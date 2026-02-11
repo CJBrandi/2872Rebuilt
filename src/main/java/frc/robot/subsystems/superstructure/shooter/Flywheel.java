@@ -113,26 +113,27 @@ public class Flywheel {
         Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
     Logger.recordOutput("Shooter/Flywheel/AtSetpoint", atSetpoint);
     Logger.recordOutput("Shooter/Flywheel/ClosedLoop", closedLoop);
-    Logger.recordOutput("Shooter/Flywheel/DirectWheelVelocity", directWheelVelocity);
   }
 
   /** Sets the target exit velocity. */
   public void setTargetExitVelocity(double velocityMps) {
     closedLoop = true;
-    directWheelVelocity = false;
     this.targetExitVelocityMps = velocityMps;
   }
 
   /** Directly runs at a wheel velocity (bypasses exit velocity conversion). */
   public void runWheelVelocity(double velocityRadPerSec) {
     closedLoop = true;
+
+    targetExitVelocityMps = 0.0;
+
     directWheelVelocity = true;
+
     targetWheelVelocityRadPerSec = velocityRadPerSec;
   }
 
   public void runVolts(double volts) {
     closedLoop = false;
-    directWheelVelocity = false;
     targetExitVelocityMps = 0.0;
     targetWheelVelocityRadPerSec = 0.0;
     velocityLimiter.reset(inputs.velocityRadPerSec);
@@ -141,7 +142,6 @@ public class Flywheel {
 
   public void runOpenLoop(double output) {
     closedLoop = false;
-    directWheelVelocity = false;
     targetExitVelocityMps = 0.0;
     targetWheelVelocityRadPerSec = 0.0;
     velocityLimiter.reset(inputs.velocityRadPerSec);
@@ -150,7 +150,6 @@ public class Flywheel {
 
   public void stop() {
     closedLoop = true;
-    directWheelVelocity = false;
     targetExitVelocityMps = 0.0;
     targetWheelVelocityRadPerSec = 0.0;
   }

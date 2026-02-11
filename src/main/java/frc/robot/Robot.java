@@ -26,6 +26,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 public class Robot extends LoggedRobot {
   private Command autonomousCommand;
   private RobotContainer robotContainer;
+  private boolean hasHomedThisBoot = false;
 
   public Robot() {
     // Record metadata
@@ -104,9 +105,13 @@ public class Robot extends LoggedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
+    if (!hasHomedThisBoot) {
+      CommandScheduler.getInstance().schedule(robotContainer.getHomingCommand());
+      hasHomedThisBoot = true;
+    }
+
     autonomousCommand = robotContainer.getAutonomousCommand();
 
-    // schedule the autonomous command (example)
     if (autonomousCommand != null) {
       CommandScheduler.getInstance().schedule(autonomousCommand);
     }
@@ -119,10 +124,11 @@ public class Robot extends LoggedRobot {
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
-    // This makes sure that the autonomous stops running when
-    // teleop starts running. If you want the autonomous to
-    // continue until interrupted by another command, remove
-    // this line or comment it out.
+    if (!hasHomedThisBoot) {
+      CommandScheduler.getInstance().schedule(robotContainer.getHomingCommand());
+      hasHomedThisBoot = true;
+    }
+
     if (autonomousCommand != null) {
       autonomousCommand.cancel();
     }

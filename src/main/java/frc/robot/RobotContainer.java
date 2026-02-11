@@ -70,11 +70,11 @@ public class RobotContainer {
       case REAL:
         drive =
             new Drive(
-                new GyroIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {});
+                new GyroIOPigeon2(),
+                new ModuleIOTalonFX(TunerConstants.FrontLeft),
+                new ModuleIOTalonFX(TunerConstants.FrontRight),
+                new ModuleIOTalonFX(TunerConstants.BackLeft),
+                new ModuleIOTalonFX(TunerConstants.BackRight));
 
         superstructure =
             new Superstructure(
@@ -225,38 +225,39 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    // Default command, normal field-relative drive
     drive.setDefaultCommand(
-        DriveCommands.joystickDrive(
-            drive,
-            () -> -controller.getLeftY(),
-            () -> -controller.getLeftX(),
-            () -> -controller.getRightX()));
+        Commands.either(
+            DriveCommands.joystickDrive(
+                drive,
+                () -> -controller.getLeftY(),
+                () -> -controller.getLeftX(),
+                () -> -controller.getRightX()),
+            Commands.none(),
+            this::isHoodHomed));
 
-    // Toggle continuous shooting with X button
     controller
         .x()
         .onTrue(
             Commands.runOnce(
-                () -> {
-                  continuousShootingEnabled = !continuousShootingEnabled;
-                }));
+                    () -> {
+                      continuousShootingEnabled = !continuousShootingEnabled;
+                    })
+                .onlyIf(this::isHoodHomed));
 
-    // Run continuous shooting command with rate limiting
     superstructure.setDefaultCommand(
         Commands.run(
-            () -> {
-              if (continuousShootingEnabled) {
-                double currentTime = Timer.getFPGATimestamp();
-                if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
-                  superstructure.launchFuelSim();
-                  lastShotTime = currentTime;
-                }
-              }
-            },
-            superstructure));
+                () -> {
+                  if (continuousShootingEnabled) {
+                    double currentTime = Timer.getFPGATimestamp();
+                    if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
+                      superstructure.launchFuelSim();
+                      lastShotTime = currentTime;
+                    }
+                  }
+                },
+                superstructure)
+            .onlyIf(this::isHoodHomed));
 
-    // Reset gyro to 0° when B button is pressed
     controller
         .b()
         .onTrue(
@@ -280,5 +281,13 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return autoChooser.get();
+  }
+
+  public Command getHomingCommand() {
+    return superstructure.getShooter().hoodHomingCommand();
+  }
+
+  public boolean isHoodHomed() {
+    return superstructure.getShooter().isHoodHomed();
   }
 }

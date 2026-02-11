@@ -31,16 +31,15 @@ public class Superstructure extends SubsystemBase {
     // Get shooting parameters from calculator
     var params = shotCalculator.getParameters();
 
-    // Always aim - shooter and turret continuously track target
-    shooter.setGoals(params.exitVelocity(), params.pitchAngle(), params.pitchVelocity());
-    turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
+    if (shooter.isHoodHomed()) {
+      shooter.setGoals(params.exitVelocity(), params.pitchAngle(), params.pitchVelocity());
+      turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
+    }
 
-    // Update subsystem periodics
     shooter.periodic();
     turret.periodic();
     indexer.periodic();
 
-    // Logging
     Logger.recordOutput("Superstructure/ReadyToShoot", isReadyToShoot());
   }
 

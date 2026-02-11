@@ -52,11 +52,9 @@ public class Shooter {
       hood.setTargetAngle(Math.toRadians(90) - goalHoodAngleRad, goalHoodVelocityRadPerSec);
     }
 
-    // Run control loops after targets are set
     flywheel.periodic();
     hood.periodic();
 
-    // Log goal values
     Logger.recordOutput("Shooter/ManualMode", manualModeEnabled.get() > 0.5);
     Logger.recordOutput("Shooter/Manual/FlywheelRPM", manualFlywheelRPM.get());
     Logger.recordOutput("Shooter/Manual/HoodAngleDeg", manualHoodAngleDeg.get());
