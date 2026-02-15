@@ -17,7 +17,7 @@ public class Flywheel {
   private static final double WHEEL_RADIUS = Units.inchesToMeters(2.0);
 
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Flywheel/kP", 3.0);
-  private static final LoggedTunableNumber kI = new LoggedTunableNumber("Shooter/Flywheel/kI", 0.0);
+  private static final LoggedTunableNumber kI = new LoggedTunableNumber("Shooter/Flywheel/kI", 0.1);
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/Flywheel/kD", 0.0);
   // Feedforward gains for torque current control (Amps)
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Flywheel/kS", 7.0);
@@ -89,12 +89,12 @@ public class Flywheel {
       io.runVelocity(velocitySetpointRadPerSec);
     }
 
-    // Check if at setpoint
+    // Check if at setpoint (compare against slew-limited setpoint, not final target)
     if (closedLoop) {
       double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(50);
       atSetpoint =
           EqualsUtil.epsilonEquals(
-              inputs.velocityRadPerSec, targetWheelVelocityRadPerSec, toleranceRadPerSec);
+              inputs.velocityRadPerSec, velocitySetpointRadPerSec, toleranceRadPerSec);
     } else {
       atSetpoint = false;
     }
@@ -118,6 +118,7 @@ public class Flywheel {
   /** Sets the target exit velocity. */
   public void setTargetExitVelocity(double velocityMps) {
     closedLoop = true;
+    directWheelVelocity = false;
     this.targetExitVelocityMps = velocityMps;
   }
 

@@ -52,6 +52,7 @@ public class ShotCalculator {
   @Getter private double minDistance = Double.MAX_VALUE;
   @Getter private double maxDistance = 0;
   @Getter private boolean loaded = false;
+  @Getter private boolean shootOnMoveEnabled = false;
 
   // Filters for velocity calculation
   private final LinearFilter turretAngleFilter =
@@ -68,6 +69,11 @@ public class ShotCalculator {
 
   private ShotCalculator() {
     load();
+  }
+
+  /** Enables or disables shoot-on-the-move velocity compensation. */
+  public void setShootOnMoveEnabled(boolean enabled) {
+    this.shootOnMoveEnabled = enabled;
   }
 
   /** Loads the shot map from the deploy directory. */
@@ -136,35 +142,37 @@ public class ShotCalculator {
     Translation2d turretPosition =
         robotPose.getTranslation().plus(robotToTurret.rotateBy(robotPose.getRotation()));
 
-    // Field-relative turret velocity (robot velocity + tangential from rotation)
-    double turretVelocityX =
-        robotVelocity.vxMetersPerSecond
-            - robotVelocity.omegaRadiansPerSecond
-                * robotToTurret.rotateBy(robotPose.getRotation()).getY();
-    double turretVelocityY =
-        robotVelocity.vyMetersPerSecond
-            + robotVelocity.omegaRadiansPerSecond
-                * robotToTurret.rotateBy(robotPose.getRotation()).getX();
-
     // Time-of-flight recursion: iterate until distance converges
     double distance = targetPosition.getDistance(turretPosition);
     Translation2d compensatedPosition = turretPosition;
     int iterations = 0;
 
-    for (int i = 0; i < MAX_TOF_ITERATIONS; i++) {
-      double clampedDistance = Math.max(minDistance, Math.min(maxDistance, distance));
-      double tof = flightTimeMap.get(clampedDistance);
+    if (shootOnMoveEnabled) {
+      // Field-relative turret velocity (robot velocity + tangential from rotation)
+      double turretVelocityX =
+          robotVelocity.vxMetersPerSecond
+              - robotVelocity.omegaRadiansPerSecond
+                  * robotToTurret.rotateBy(robotPose.getRotation()).getY();
+      double turretVelocityY =
+          robotVelocity.vyMetersPerSecond
+              + robotVelocity.omegaRadiansPerSecond
+                  * robotToTurret.rotateBy(robotPose.getRotation()).getX();
 
-      Translation2d offset = new Translation2d(turretVelocityX * tof, turretVelocityY * tof);
-      compensatedPosition = turretPosition.plus(offset);
+      for (int i = 0; i < MAX_TOF_ITERATIONS; i++) {
+        double clampedDistance = Math.max(minDistance, Math.min(maxDistance, distance));
+        double tof = flightTimeMap.get(clampedDistance);
 
-      double newDistance = targetPosition.getDistance(compensatedPosition);
-      iterations = i + 1;
+        Translation2d offset = new Translation2d(turretVelocityX * tof, turretVelocityY * tof);
+        compensatedPosition = turretPosition.plus(offset);
 
-      if (Math.abs(newDistance - distance) < TOF_CONVERGENCE_THRESHOLD) {
-        break;
+        double newDistance = targetPosition.getDistance(compensatedPosition);
+        iterations = i + 1;
+
+        if (Math.abs(newDistance - distance) < TOF_CONVERGENCE_THRESHOLD) {
+          break;
+        }
+        distance = newDistance;
       }
-      distance = newDistance;
     }
 
     // Clamp final distance for lookup
@@ -197,6 +205,7 @@ public class ShotCalculator {
     lastPitchAngle = pitchAngle;
 
     // Log calculated values
+    Logger.recordOutput("ShotCalculator/ShootOnMoveEnabled", shootOnMoveEnabled);
     Logger.recordOutput(
         "ShotCalculator/CompensatedPosition", new Pose2d(compensatedPosition, turretAngle));
     Logger.recordOutput("ShotCalculator/TurretToTargetDistance", lookaheadDistance);

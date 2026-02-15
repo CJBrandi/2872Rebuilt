@@ -70,7 +70,7 @@ public class HoodIOTalonFX implements HoodIO {
     temp = talon.getDeviceTemp();
 
     BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0, position, velocity, appliedVolts, torqueCurrent, temp);
+        250.0, position, velocity, appliedVolts, torqueCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 

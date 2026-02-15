@@ -103,20 +103,19 @@ public class Hood {
       var goalState = new TrapezoidProfile.State(clampedTarget, targetVelocityRadPerSec);
       setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
 
-      // Calculate feedforward in Amps: kS for static friction, kV for velocity, kG for gravity
+      // Calculate feedforward in Amps: kS for static friction, kG for gravity
       double feedforwardAmps =
-          kS.get() * Math.signum(setpoint.velocity) + Math.signum(setpoint.velocity) > 0
-              ? kG.get() * Math.cos(setpoint.position)
-              : 0; // Gravity compensation
+          kS.get() * Math.signum(setpoint.velocity)
+              + (setpoint.velocity > 0 ? kG.get() * Math.cos(setpoint.position) : 0);
 
       io.runPosition(setpoint.position, feedforwardAmps);
 
-      // Check if at goal
+      // Check if at goal (compare actual position, not profile setpoint)
       atGoal =
           EqualsUtil.epsilonEquals(
-                  setpoint.position, goalState.position, Units.degreesToRadians(0.5))
+                  inputs.positionRad, goalState.position, Units.degreesToRadians(0.5))
               && EqualsUtil.epsilonEquals(
-                  setpoint.velocity, goalState.velocity, Units.degreesToRadians(5.0));
+                  inputs.velocityRadPerSec, goalState.velocity, Units.degreesToRadians(5.0));
     } else {
       atGoal = false;
     }

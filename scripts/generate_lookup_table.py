@@ -3,7 +3,7 @@
 Generate shooting lookup table for FRC 2026.
 
 Uses the trajectory optimization backend to compute optimal shooting parameters
-for distances from 0.5m to 6.0m in 0.1m increments.
+for distances from 1.5m to 6.0m in 0.1m increments.
 
 Usage:
     python generate_lookup_table.py [--output PATH] [--min MIN] [--max MAX] [--step STEP]
@@ -33,7 +33,7 @@ from shooter_trajectory_backend import (
 
 
 def generate_lookup_table(
-    min_distance: float = 0.5,
+    min_distance: float = 1.5,
     max_distance: float = 6.0,
     step: float = 0.1,
     config: Optional[ShooterConfig] = None,
@@ -195,7 +195,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--min", type=float, default=0.5,
+        "--min", type=float, default=1.5,
         help="Minimum distance in meters"
     )
     parser.add_argument(

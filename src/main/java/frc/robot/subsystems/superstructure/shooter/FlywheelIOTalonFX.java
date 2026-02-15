@@ -70,7 +70,7 @@ public class FlywheelIOTalonFX implements FlywheelIO {
     supplyCurrent = talon.getSupplyCurrent();
     temp = talon.getDeviceTemp();
 
-    BaseStatusSignal.setUpdateFrequencyForAll(50.0, velocity, appliedVolts, torqueCurrent, temp);
+    BaseStatusSignal.setUpdateFrequencyForAll(250.0, velocity, appliedVolts, torqueCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 
