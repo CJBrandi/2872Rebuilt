@@ -1,0 +1,532 @@
+{
+  "metadata": {
+    "description": "FRC 2026 shooter trajectory vector lookup table",
+    "generated_by": "generate_lookup_table.py",
+    "physics_model": "3D trajectory with magnitude-based drag",
+    "optimization": "Minimize flight time (Sleipnir/jormungandr)",
+    "frame": "shooter_coordinates",
+    "axis_convention": "+x forward, +y left, +z up"
+  },
+  "config": {
+    "target_height_m": 1.8288,
+    "shooter_height_m": 0.508,
+    "max_entry_angle_deg": 25.0,
+    "ball_mass_kg": 0.227,
+    "ball_diameter_m": 0.15062199999999998,
+    "drag_coefficient": 0.47,
+    "air_density_kg_m3": 1.204
+  },
+  "range": {
+    "min_distance_m": 1.5,
+    "max_distance_m": 6.0,
+    "step_m": 0.1
+  },
+  "entries": [
+    {
+      "distance": 1.5,
+      "velocity_vector_mps": {
+        "x": 1.6378,
+        "y": 0.0,
+        "z": 6.2085
+      },
+      "speed_mps": 6.4209,
+      "pitch_rad": 1.312877,
+      "flight_time": 0.9721
+    },
+    {
+      "distance": 1.6,
+      "velocity_vector_mps": {
+        "x": 1.7105,
+        "y": 0.0,
+        "z": 6.2909
+      },
+      "speed_mps": 6.5193,
+      "pitch_rad": 1.305313,
+      "flight_time": 0.9944
+    },
+    {
+      "distance": 1.7,
+      "velocity_vector_mps": {
+        "x": 1.7813,
+        "y": 0.0,
+        "z": 6.3729
+      },
+      "speed_mps": 6.6172,
+      "pitch_rad": 1.298236,
+      "flight_time": 1.0161
+    },
+    {
+      "distance": 1.8,
+      "velocity_vector_mps": {
+        "x": 1.8504,
+        "y": 0.0,
+        "z": 6.4544
+      },
+      "speed_mps": 6.7144,
+      "pitch_rad": 1.291596,
+      "flight_time": 1.0374
+    },
+    {
+      "distance": 1.9,
+      "velocity_vector_mps": {
+        "x": 1.9179,
+        "y": 0.0,
+        "z": 6.5355
+      },
+      "speed_mps": 6.8111,
+      "pitch_rad": 1.28535,
+      "flight_time": 1.0581
+    },
+    {
+      "distance": 2.0,
+      "velocity_vector_mps": {
+        "x": 1.9839,
+        "y": 0.0,
+        "z": 6.6159
+      },
+      "speed_mps": 6.907,
+      "pitch_rad": 1.27946,
+      "flight_time": 1.0785
+    },
+    {
+      "distance": 2.1,
+      "velocity_vector_mps": {
+        "x": 2.0486,
+        "y": 0.0,
+        "z": 6.6959
+      },
+      "speed_mps": 7.0023,
+      "pitch_rad": 1.273892,
+      "flight_time": 1.0984
+    },
+    {
+      "distance": 2.2,
+      "velocity_vector_mps": {
+        "x": 2.112,
+        "y": 0.0,
+        "z": 6.7752
+      },
+      "speed_mps": 7.0968,
+      "pitch_rad": 1.268617,
+      "flight_time": 1.1179
+    },
+    {
+      "distance": 2.3,
+      "velocity_vector_mps": {
+        "x": 2.1743,
+        "y": 0.0,
+        "z": 6.8541
+      },
+      "speed_mps": 7.1907,
+      "pitch_rad": 1.263609,
+      "flight_time": 1.1371
+    },
+    {
+      "distance": 2.4,
+      "velocity_vector_mps": {
+        "x": 2.2355,
+        "y": 0.0,
+        "z": 6.9323
+      },
+      "speed_mps": 7.2838,
+      "pitch_rad": 1.258845,
+      "flight_time": 1.1558
+    },
+    {
+      "distance": 2.5,
+      "velocity_vector_mps": {
+        "x": 2.2958,
+        "y": 0.0,
+        "z": 7.0099
+      },
+      "speed_mps": 7.3763,
+      "pitch_rad": 1.254304,
+      "flight_time": 1.1743
+    },
+    {
+      "distance": 2.6,
+      "velocity_vector_mps": {
+        "x": 2.355,
+        "y": 0.0,
+        "z": 7.0869
+      },
+      "speed_mps": 7.468,
+      "pitch_rad": 1.24997,
+      "flight_time": 1.1924
+    },
+    {
+      "distance": 2.7,
+      "velocity_vector_mps": {
+        "x": 2.4135,
+        "y": 0.0,
+        "z": 7.1634
+      },
+      "speed_mps": 7.559,
+      "pitch_rad": 1.245824,
+      "flight_time": 1.2103
+    },
+    {
+      "distance": 2.8,
+      "velocity_vector_mps": {
+        "x": 2.4711,
+        "y": 0.0,
+        "z": 7.2393
+      },
+      "speed_mps": 7.6494,
+      "pitch_rad": 1.241853,
+      "flight_time": 1.2278
+    },
+    {
+      "distance": 2.9,
+      "velocity_vector_mps": {
+        "x": 2.5279,
+        "y": 0.0,
+        "z": 7.3145
+      },
+      "speed_mps": 7.739,
+      "pitch_rad": 1.238043,
+      "flight_time": 1.245
+    },
+    {
+      "distance": 3.0,
+      "velocity_vector_mps": {
+        "x": 2.5841,
+        "y": 0.0,
+        "z": 7.3892
+      },
+      "speed_mps": 7.828,
+      "pitch_rad": 1.234383,
+      "flight_time": 1.262
+    },
+    {
+      "distance": 3.1,
+      "velocity_vector_mps": {
+        "x": 2.6395,
+        "y": 0.0,
+        "z": 7.4633
+      },
+      "speed_mps": 7.9163,
+      "pitch_rad": 1.230862,
+      "flight_time": 1.2787
+    },
+    {
+      "distance": 3.2,
+      "velocity_vector_mps": {
+        "x": 2.6943,
+        "y": 0.0,
+        "z": 7.5369
+      },
+      "speed_mps": 8.004,
+      "pitch_rad": 1.227469,
+      "flight_time": 1.2952
+    },
+    {
+      "distance": 3.3,
+      "velocity_vector_mps": {
+        "x": 2.7486,
+        "y": 0.0,
+        "z": 7.6099
+      },
+      "speed_mps": 8.0911,
+      "pitch_rad": 1.224197,
+      "flight_time": 1.3115
+    },
+    {
+      "distance": 3.4,
+      "velocity_vector_mps": {
+        "x": 2.8022,
+        "y": 0.0,
+        "z": 7.6824
+      },
+      "speed_mps": 8.1775,
+      "pitch_rad": 1.221037,
+      "flight_time": 1.3275
+    },
+    {
+      "distance": 3.5,
+      "velocity_vector_mps": {
+        "x": 2.8553,
+        "y": 0.0,
+        "z": 7.7543
+      },
+      "speed_mps": 8.2633,
+      "pitch_rad": 1.217981,
+      "flight_time": 1.3432
+    },
+    {
+      "distance": 3.6,
+      "velocity_vector_mps": {
+        "x": 2.9079,
+        "y": 0.0,
+        "z": 7.8257
+      },
+      "speed_mps": 8.3485,
+      "pitch_rad": 1.215024,
+      "flight_time": 1.3588
+    },
+    {
+      "distance": 3.7,
+      "velocity_vector_mps": {
+        "x": 2.96,
+        "y": 0.0,
+        "z": 7.8966
+      },
+      "speed_mps": 8.4332,
+      "pitch_rad": 1.212158,
+      "flight_time": 1.3742
+    },
+    {
+      "distance": 3.8,
+      "velocity_vector_mps": {
+        "x": 3.0117,
+        "y": 0.0,
+        "z": 7.9671
+      },
+      "speed_mps": 8.5173,
+      "pitch_rad": 1.209378,
+      "flight_time": 1.3893
+    },
+    {
+      "distance": 3.9,
+      "velocity_vector_mps": {
+        "x": 3.063,
+        "y": 0.0,
+        "z": 8.0369
+      },
+      "speed_mps": 8.6008,
+      "pitch_rad": 1.206679,
+      "flight_time": 1.4043
+    },
+    {
+      "distance": 4.0,
+      "velocity_vector_mps": {
+        "x": 3.1138,
+        "y": 0.0,
+        "z": 8.1063
+      },
+      "speed_mps": 8.6838,
+      "pitch_rad": 1.204057,
+      "flight_time": 1.4191
+    },
+    {
+      "distance": 4.1,
+      "velocity_vector_mps": {
+        "x": 3.1642,
+        "y": 0.0,
+        "z": 8.1752
+      },
+      "speed_mps": 8.7662,
+      "pitch_rad": 1.201506,
+      "flight_time": 1.4337
+    },
+    {
+      "distance": 4.2,
+      "velocity_vector_mps": {
+        "x": 3.2143,
+        "y": 0.0,
+        "z": 8.2437
+      },
+      "speed_mps": 8.8482,
+      "pitch_rad": 1.199022,
+      "flight_time": 1.4481
+    },
+    {
+      "distance": 4.3,
+      "velocity_vector_mps": {
+        "x": 3.264,
+        "y": 0.0,
+        "z": 8.3117
+      },
+      "speed_mps": 8.9296,
+      "pitch_rad": 1.196602,
+      "flight_time": 1.4624
+    },
+    {
+      "distance": 4.4,
+      "velocity_vector_mps": {
+        "x": 3.3133,
+        "y": 0.0,
+        "z": 8.3792
+      },
+      "speed_mps": 9.0105,
+      "pitch_rad": 1.194243,
+      "flight_time": 1.4765
+    },
+    {
+      "distance": 4.5,
+      "velocity_vector_mps": {
+        "x": 3.3624,
+        "y": 0.0,
+        "z": 8.4463
+      },
+      "speed_mps": 9.091,
+      "pitch_rad": 1.19194,
+      "flight_time": 1.4904
+    },
+    {
+      "distance": 4.6,
+      "velocity_vector_mps": {
+        "x": 3.4111,
+        "y": 0.0,
+        "z": 8.513
+      },
+      "speed_mps": 9.171,
+      "pitch_rad": 1.189692,
+      "flight_time": 1.5041
+    },
+    {
+      "distance": 4.7,
+      "velocity_vector_mps": {
+        "x": 3.4595,
+        "y": 0.0,
+        "z": 8.5792
+      },
+      "speed_mps": 9.2505,
+      "pitch_rad": 1.187495,
+      "flight_time": 1.5178
+    },
+    {
+      "distance": 4.8,
+      "velocity_vector_mps": {
+        "x": 3.5077,
+        "y": 0.0,
+        "z": 8.645
+      },
+      "speed_mps": 9.3295,
+      "pitch_rad": 1.185346,
+      "flight_time": 1.5312
+    },
+    {
+      "distance": 4.9,
+      "velocity_vector_mps": {
+        "x": 3.5556,
+        "y": 0.0,
+        "z": 8.7105
+      },
+      "speed_mps": 9.4082,
+      "pitch_rad": 1.183243,
+      "flight_time": 1.5446
+    },
+    {
+      "distance": 5.0,
+      "velocity_vector_mps": {
+        "x": 3.6032,
+        "y": 0.0,
+        "z": 8.7755
+      },
+      "speed_mps": 9.4864,
+      "pitch_rad": 1.181184,
+      "flight_time": 1.5578
+    },
+    {
+      "distance": 5.1,
+      "velocity_vector_mps": {
+        "x": 3.6506,
+        "y": 0.0,
+        "z": 8.84
+      },
+      "speed_mps": 9.5641,
+      "pitch_rad": 1.179166,
+      "flight_time": 1.5708
+    },
+    {
+      "distance": 5.2,
+      "velocity_vector_mps": {
+        "x": 3.6977,
+        "y": 0.0,
+        "z": 8.9042
+      },
+      "speed_mps": 9.6415,
+      "pitch_rad": 1.177188,
+      "flight_time": 1.5837
+    },
+    {
+      "distance": 5.3,
+      "velocity_vector_mps": {
+        "x": 3.7447,
+        "y": 0.0,
+        "z": 8.9681
+      },
+      "speed_mps": 9.7185,
+      "pitch_rad": 1.175248,
+      "flight_time": 1.5965
+    },
+    {
+      "distance": 5.4,
+      "velocity_vector_mps": {
+        "x": 3.7914,
+        "y": 0.0,
+        "z": 9.0315
+      },
+      "speed_mps": 9.795,
+      "pitch_rad": 1.173344,
+      "flight_time": 1.6092
+    },
+    {
+      "distance": 5.5,
+      "velocity_vector_mps": {
+        "x": 3.8379,
+        "y": 0.0,
+        "z": 9.0946
+      },
+      "speed_mps": 9.8712,
+      "pitch_rad": 1.171474,
+      "flight_time": 1.6217
+    },
+    {
+      "distance": 5.6,
+      "velocity_vector_mps": {
+        "x": 3.8842,
+        "y": 0.0,
+        "z": 9.1573
+      },
+      "speed_mps": 9.947,
+      "pitch_rad": 1.169637,
+      "flight_time": 1.6341
+    },
+    {
+      "distance": 5.7,
+      "velocity_vector_mps": {
+        "x": 3.9303,
+        "y": 0.0,
+        "z": 9.2196
+      },
+      "speed_mps": 10.0224,
+      "pitch_rad": 1.167831,
+      "flight_time": 1.6464
+    },
+    {
+      "distance": 5.8,
+      "velocity_vector_mps": {
+        "x": 3.9762,
+        "y": 0.0,
+        "z": 9.2817
+      },
+      "speed_mps": 10.0975,
+      "pitch_rad": 1.166055,
+      "flight_time": 1.6586
+    },
+    {
+      "distance": 5.9,
+      "velocity_vector_mps": {
+        "x": 4.0219,
+        "y": 0.0,
+        "z": 9.3433
+      },
+      "speed_mps": 10.1722,
+      "pitch_rad": 1.164308,
+      "flight_time": 1.6707
+    },
+    {
+      "distance": 6.0,
+      "velocity_vector_mps": {
+        "x": 4.0675,
+        "y": 0.0,
+        "z": 9.4047
+      },
+      "speed_mps": 10.2466,
+      "pitch_rad": 1.162588,
+      "flight_time": 1.6826
+    }
+  ]
+}

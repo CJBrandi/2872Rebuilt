@@ -2,6 +2,7 @@ package frc.robot.subsystems.superstructure.shooter;
 
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.Constants;
 import frc.robot.util.LoggedTunableNumber;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -152,6 +153,6 @@ public class Shooter {
 
   /** Returns whether the hood has been homed. */
   public boolean isHoodHomed() {
-    return hood.isHomed();
+    return Constants.currentMode == Constants.Mode.SIM || hood.isHomed();
   }
 }

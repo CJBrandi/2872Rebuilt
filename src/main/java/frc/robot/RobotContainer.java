@@ -12,6 +12,7 @@ import static frc.robot.subsystems.vision.VisionConstants.*;
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
@@ -157,7 +158,15 @@ public class RobotContainer {
           Constants.RobotDimensions.length,
           Constants.RobotDimensions.bumperHeight,
           drive::getPose,
-          () -> RobotState.getInstance().getRobotVelocity());
+          () -> {
+            ChassisSpeeds robotRelativeSpeeds = RobotState.getInstance().getRobotVelocity();
+            Rotation2d robotHeading = drive.getPose().getRotation();
+            return ChassisSpeeds.fromRobotRelativeSpeeds(
+                robotRelativeSpeeds.vxMetersPerSecond,
+                robotRelativeSpeeds.vyMetersPerSecond,
+                robotRelativeSpeeds.omegaRadiansPerSecond,
+                robotHeading);
+          });
 
       // Register intake bounding box
       fuelSim.registerIntake(

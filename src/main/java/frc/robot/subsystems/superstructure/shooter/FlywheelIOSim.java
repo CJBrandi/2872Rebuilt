@@ -10,27 +10,33 @@ import frc.robot.Constants;
 public class FlywheelIOSim implements FlywheelIO {
   // Moment of inertia for flywheel (kg*m^2)
   private static final double MOI = 0.005;
+  private static final int FLYWHEEL_MOTOR_COUNT = 2;
+  private static final double MAX_TORQUE_CURRENT_PER_MOTOR_AMPS = 60.0;
+  private static final double MAX_TORQUE_CURRENT_TOTAL_AMPS =
+      MAX_TORQUE_CURRENT_PER_MOTOR_AMPS * FLYWHEEL_MOTOR_COUNT;
 
-  // REV Vortex (NEO Vortex) with step-up gearing (flywheel spins faster than motor)
+  // 2x Kraken X60 with step-up gearing (flywheel spins faster than motor)
   // stepUp = 2 means flywheel is 2x motor speed, so reduction ratio = 1/stepUp = 0.5
   private static final DCMotor GEARBOX =
-      DCMotor.getNeoVortex(1)
+      DCMotor.getKrakenX60(FLYWHEEL_MOTOR_COUNT)
           .withReduction(
               1.0 / Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.stepUp);
 
   // State-space model for velocity only: dx/dt = A*x + B*u
-  // For a flywheel: dω/dt = -Kt/(Kv*R*J) * ω + Kt/(R*J) * I
-  // Where ω is angular velocity, I is torque current
+  // Voltage-driven flywheel model:
+  // dω/dt = -Kt/(Kv*R*J) * ω + Kt/(R*J) * V
+  // Where ω is angular velocity and V is applied voltage.
   private static final Matrix<N1, N1> A =
       MatBuilder.fill(
           Nat.N1(),
           Nat.N1(),
           -GEARBOX.KtNMPerAmp / (GEARBOX.KvRadPerSecPerVolt * GEARBOX.rOhms * MOI));
-  private static final Vector<N1> B = VecBuilder.fill(GEARBOX.KtNMPerAmp / MOI);
+  private static final Vector<N1> B = VecBuilder.fill(GEARBOX.KtNMPerAmp / (GEARBOX.rOhms * MOI));
 
   // State: angular velocity (rad/s)
   private Vector<N1> simState;
-  private double inputTorqueCurrent = 0.0;
+  private double commandedTorqueCurrent = 0.0;
+  private double actualTorqueCurrent = 0.0;
   private double appliedVolts = 0.0;
 
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
@@ -62,7 +68,7 @@ public class FlywheelIOSim implements FlywheelIO {
     inputs.encoderConnected = true;
     inputs.velocityRadPerSec = simState.get(0);
     inputs.appliedVolts = appliedVolts;
-    inputs.currentAmps = Math.abs(inputTorqueCurrent);
+    inputs.currentAmps = Math.abs(actualTorqueCurrent);
     inputs.tempCelsius = 0.0;
   }
 
@@ -106,14 +112,19 @@ public class FlywheelIOSim implements FlywheelIO {
   }
 
   private void setInputTorqueCurrent(double torqueCurrent) {
-    inputTorqueCurrent = MathUtil.clamp(torqueCurrent, -40.0, 40.0);
-    appliedVolts = GEARBOX.getVoltage(GEARBOX.getTorque(inputTorqueCurrent), simState.get(0));
+    commandedTorqueCurrent =
+        MathUtil.clamp(
+            torqueCurrent, -MAX_TORQUE_CURRENT_TOTAL_AMPS, MAX_TORQUE_CURRENT_TOTAL_AMPS);
+    appliedVolts = GEARBOX.getVoltage(GEARBOX.getTorque(commandedTorqueCurrent), simState.get(0));
     appliedVolts = MathUtil.clamp(appliedVolts, -12.0, 12.0);
+    actualTorqueCurrent = GEARBOX.getCurrent(simState.get(0), appliedVolts);
   }
 
   private void setInputVoltage(double voltage) {
     voltage = MathUtil.clamp(voltage, -12.0, 12.0);
-    setInputTorqueCurrent(GEARBOX.getCurrent(simState.get(0), voltage));
+    appliedVolts = voltage;
+    actualTorqueCurrent = GEARBOX.getCurrent(simState.get(0), appliedVolts);
+    commandedTorqueCurrent = actualTorqueCurrent;
   }
 
   private void update(double dt) {
@@ -121,7 +132,7 @@ public class FlywheelIOSim implements FlywheelIO {
         NumericalIntegration.rkdp(
             (Matrix<N1, N1> x, Matrix<N1, N1> u) -> A.times(x).plus(B.times(u)),
             simState,
-            VecBuilder.fill(inputTorqueCurrent),
+            VecBuilder.fill(appliedVolts),
             dt);
 
     simState = VecBuilder.fill(updatedState.get(0, 0));

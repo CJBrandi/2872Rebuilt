@@ -45,7 +45,7 @@ public class Superstructure extends SubsystemBase {
 
   @AutoLogOutput(key = "Superstructure/ReadyToShoot")
   public boolean isReadyToShoot() {
-    return shooter.isReady() && turret.isAtGoal();
+    return shooter.isReady() && turret.isAtGoal() && shotCalculator.isShotStable();
   }
 
   public boolean isFlywheelReady() {
