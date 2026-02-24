@@ -22,9 +22,11 @@ public interface IndexerIO {
 
   default void stop() {}
 
-  default void runVelocity(double radsPerSec, double feedforward) {}
+  default void runVelocity(double radsPerSec) {}
 
   default void setPID(double kP, double kI, double kD) {}
+
+  default void setFF(double kS, double kV) {}
 
   default void setBrakeMode(boolean enabled) {}
 }

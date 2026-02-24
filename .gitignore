@@ -188,3 +188,4 @@ src/main/java/frc/robot/BuildConstants.java
 
 # Vibecoding file
 AGENTS.md
+.vscode/settings.json

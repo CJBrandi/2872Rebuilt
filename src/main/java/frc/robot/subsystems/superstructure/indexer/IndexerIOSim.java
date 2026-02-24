@@ -1,6 +1,11 @@
 package frc.robot.subsystems.superstructure.indexer;
 
-import edu.wpi.first.math.*;
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.MatBuilder;
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.Nat;
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.Vector;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.system.NumericalIntegration;
@@ -8,9 +13,9 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import frc.robot.Constants;
 
 public class IndexerIOSim implements IndexerIO {
-  private static final double moi = 0.003;
+  private static final double MOI = 0.003;
 
-  private static final DCMotor gearbox =
+  private static final DCMotor GEARBOX =
       DCMotor.getKrakenX60Foc(1)
           .withReduction(Constants.SuperstructureConstants.IndexerConstants.reduction);
 
@@ -18,15 +23,16 @@ public class IndexerIOSim implements IndexerIO {
       MatBuilder.fill(
           Nat.N1(),
           Nat.N1(),
-          -gearbox.KtNMPerAmp / (gearbox.KvRadPerSecPerVolt * gearbox.rOhms * moi));
-  private static final Vector<N1> B = VecBuilder.fill(gearbox.KtNMPerAmp / moi);
+          -GEARBOX.KtNMPerAmp / (GEARBOX.KvRadPerSecPerVolt * GEARBOX.rOhms * MOI));
+  private static final Vector<N1> B = VecBuilder.fill(GEARBOX.KtNMPerAmp / MOI);
 
   private Vector<N1> simState;
   private double inputTorqueCurrent = 0.0;
   private double appliedVolts = 0.0;
 
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
-  private double feedforward = 0.0;
+  private double kS = 0.0;
+  private double kV = 0.0;
   private boolean closedLoop = false;
 
   public IndexerIOSim() {
@@ -39,6 +45,8 @@ public class IndexerIOSim implements IndexerIO {
       controller.reset();
       update(Constants.loopPeriodSecs);
     } else {
+      double setpoint = controller.getSetpoint();
+      double feedforward = kS * Math.signum(setpoint) + kV * setpoint;
       for (int i = 0; i < (int) (Constants.loopPeriodSecs / (1.0 / 1000.0)); i++) {
         setInputTorqueCurrent(controller.calculate(simState.get(0)) + feedforward);
         update(1.0 / 1000.0);
@@ -71,10 +79,15 @@ public class IndexerIOSim implements IndexerIO {
   }
 
   @Override
-  public void runVelocity(double radsPerSec, double feedforward) {
+  public void runVelocity(double radsPerSec) {
     closedLoop = true;
     controller.setSetpoint(radsPerSec);
-    this.feedforward = feedforward;
+  }
+
+  @Override
+  public void setFF(double kS, double kV) {
+    this.kS = kS;
+    this.kV = kV;
   }
 
   @Override
@@ -89,13 +102,13 @@ public class IndexerIOSim implements IndexerIO {
 
   private void setInputTorqueCurrent(double torqueCurrent) {
     inputTorqueCurrent = MathUtil.clamp(torqueCurrent, -40.0, 40.0);
-    appliedVolts = gearbox.getVoltage(gearbox.getTorque(inputTorqueCurrent), simState.get(0));
+    appliedVolts = GEARBOX.getVoltage(GEARBOX.getTorque(inputTorqueCurrent), simState.get(0));
     appliedVolts = MathUtil.clamp(appliedVolts, -12.0, 12.0);
   }
 
   private void setInputVoltage(double voltage) {
     voltage = MathUtil.clamp(voltage, -12.0, 12.0);
-    setInputTorqueCurrent(gearbox.getCurrent(simState.get(0), voltage));
+    setInputTorqueCurrent(GEARBOX.getCurrent(simState.get(0), voltage));
   }
 
   private void update(double dt) {
@@ -108,7 +121,7 @@ public class IndexerIOSim implements IndexerIO {
 
     simState = VecBuilder.fill(updatedState.get(0, 0));
 
-    double maxVelocity = gearbox.freeSpeedRadPerSec;
+    double maxVelocity = GEARBOX.freeSpeedRadPerSec;
     if (Math.abs(simState.get(0)) > maxVelocity) {
       simState = VecBuilder.fill(Math.signum(simState.get(0)) * maxVelocity);
     }
