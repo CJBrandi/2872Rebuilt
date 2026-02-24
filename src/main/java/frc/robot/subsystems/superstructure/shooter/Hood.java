@@ -94,8 +94,8 @@ public class Hood {
                   Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
     }
 
-    // Run closed loop control (skip if stopProfile is set for characterization)
-    if (closedLoop && !stopProfile) {
+    // Run closed loop control (skip if stopProfile is set for characterization or not homed)
+    if (closedLoop && !stopProfile && homed) {
       // Clamp target to limits
       double clampedTarget = MathUtil.clamp(targetAngleRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD);
 

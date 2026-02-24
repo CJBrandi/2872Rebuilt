@@ -33,7 +33,8 @@ public class Elevator extends SubsystemBase {
   public enum Target {
     UP(Constants.ElevatorConstants.upPositionMeters),
     TRANSITION(Constants.ElevatorConstants.transitionPositionMeters),
-    DOWN(Constants.ElevatorConstants.downPositionMeters);
+    DOWN(Constants.ElevatorConstants.downPositionMeters),
+    AUTO(Constants.ElevatorConstants.autoPositionMeters);
 
     public final double positionMeters;
 
@@ -44,7 +45,6 @@ public class Elevator extends SubsystemBase {
 
   public static final double sprocketRadius = Units.inchesToMeters(1.756 / 2.0);
 
-  // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Elevator/kP");
   private static final LoggedTunableNumber kI = new LoggedTunableNumber("Elevator/kI");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Elevator/kD");
@@ -183,9 +183,11 @@ public class Elevator extends SubsystemBase {
     shouldEStop = toleranceDebouncer.calculate(outOfTolerance && shouldRunProfile);
     if (shouldRunProfile) {
       // Select profile based on movement direction:
-      // Slow profile: UP -> TRANSITION (going down from up position)
-      // Fast profile: TRANSITION -> DOWN and DOWN -> UP
-      boolean useSlowProfile = previousTarget == Target.UP && target == Target.TRANSITION;
+      // Slow profile: UP -> TRANSITION, AUTO -> DOWN
+      // Fast profile: TRANSITION -> DOWN, DOWN -> UP, DOWN -> AUTO
+      boolean useSlowProfile =
+          (previousTarget == Target.UP && target == Target.TRANSITION)
+              || (previousTarget == Target.AUTO && target == Target.DOWN);
       TrapezoidProfile activeProfile = useSlowProfile ? slowProfile : fastProfile;
       Logger.recordOutput("Elevator/Profile/UsingSlowProfile", useSlowProfile);
 

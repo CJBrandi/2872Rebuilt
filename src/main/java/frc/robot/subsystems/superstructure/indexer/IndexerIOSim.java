@@ -1,7 +1,7 @@
 package frc.robot.subsystems.superstructure.indexer;
 
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.MatBuilder;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.Nat;
 import edu.wpi.first.math.VecBuilder;

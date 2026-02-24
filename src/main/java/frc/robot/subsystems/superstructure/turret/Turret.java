@@ -17,7 +17,6 @@ import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-/** Turret control. This is not a Subsystem - it's managed by Superstructure. */
 public class Turret {
 
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Turret/kP", 80);
@@ -63,7 +62,7 @@ public class Turret {
   // Tracks last commanded goal to pick shortest legal path
   private double lastGoalAngle = 0.0;
 
-  private boolean homed = false;
+  @Getter private boolean homed = false;
 
   @AutoLogOutput(key = "Turret/HomedPositionRad")
   private double homedPosition = 0.0;
@@ -137,10 +136,10 @@ public class Turret {
       setTargetTurretAngle(Rotation2d.fromDegrees(manualAngleDeg.get()));
     }
 
-    // Run closed loop control if enabled and we have a target
+    // Run closed loop control if enabled, homed, and we have a target
     // Manual mode disables automatic field-relative calculations
     boolean manualMode = manualModeEnabled.get() > 0.5;
-    if (closedLoop && targetFieldRelativeAngle != null && !manualMode) {
+    if (closedLoop && homed && targetFieldRelativeAngle != null && !manualMode) {
       // Convert field-relative angle to robot-relative angle
       double robotAngleRad = RobotState.getInstance().getRobotPose().getRotation().getRadians();
       double robotAngularVelocity =
@@ -173,7 +172,7 @@ public class Turret {
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", robotRelativeGoalVelocity);
-    } else if (closedLoop && targetTurretAngle != null) {
+    } else if (closedLoop && homed && targetTurretAngle != null) {
       // Direct turret angle control (no field-relative conversion)
       double bestAngle = findBestAngleWithinLimits(targetTurretAngle.getRadians());
       lastGoalAngle = bestAngle;

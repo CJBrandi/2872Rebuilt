@@ -1,108 +1,193 @@
+// Copyright (c) 2025 FRC 6328
+// http://github.com/Mechanical-Advantage
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file at
+// the root directory of this project.
+
 package frc.robot.subsystems.intake;
 
-import edu.wpi.first.math.filter.Debouncer;
-import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.util.EqualsUtil;
-import frc.robot.util.LoggedTunableNumber;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
-import org.littletonrobotics.junction.Logger;
 
-public class Intake extends SubsystemBase {
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Intake/kP", 50);
-  private static final LoggedTunableNumber kI = new LoggedTunableNumber("Intake/kI", 0.0);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Intake/kD", 0.0);
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Intake/kV", 0.02);
-  public static final LoggedTunableNumber targetVelocityRadPerSec =
-      new LoggedTunableNumber("Intake/targetVelocityRadPerSec", 50);
+public class Intake {
+  // Angle constants: 0° = ground/deployed, 90° = stowed
+  public static final Rotation2d minAngle = Rotation2d.fromDegrees(0);
+  public static final Rotation2d maxAngle = Rotation2d.fromDegrees(90);
+  public static final Rotation2d stowedAngle = Rotation2d.fromDegrees(90);
+  public static final Rotation2d groundAngle = Rotation2d.fromDegrees(0);
 
-  private final IntakeIO io;
-  private final IntakeIOInputsAutoLogged inputs = new IntakeIOInputsAutoLogged();
-  private final Debouncer motorConnectedDebouncer =
-      new Debouncer(0.5, Debouncer.DebounceType.kFalling);
+  // Subsystems
+  @Getter private final Pivot pivot;
+  @Getter private final Roller roller;
 
-  private boolean closedLoop = false;
-
-  @Getter
-  @AutoLogOutput(key = "Intake/AtSetpoint")
-  private boolean atSetpoint = false;
-
-  public Intake(IntakeIO io) {
-    this.io = io;
+  public Intake(PivotIO pivotIO, RollerIO rollerIO) {
+    this.pivot = new Pivot(pivotIO);
+    this.roller = new Roller(rollerIO);
   }
 
-  @Override
   public void periodic() {
-    io.updateInputs(inputs);
-    Logger.processInputs("Intake", inputs);
-
-    LoggedTunableNumber.ifChanged(
-        hashCode(), () -> io.setPID(kP.get(), kI.get(), kD.get()), kP, kI, kD);
-
-    if (closedLoop) {
-      double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(50);
-      atSetpoint =
-          EqualsUtil.epsilonEquals(
-              inputs.velocityRadPerSec, targetVelocityRadPerSec.get(), toleranceRadPerSec);
-    } else {
-      atSetpoint = false;
-    }
-
-    Logger.recordOutput("Intake/Profile/SetpointVelocityRadPerSec", targetVelocityRadPerSec.get());
-    Logger.recordOutput(
-        "Intake/Profile/SetpointVelocityRPM",
-        Units.radiansPerSecondToRotationsPerMinute(targetVelocityRadPerSec.get()));
-    Logger.recordOutput("Intake/Profile/ActualVelocityRadPerSec", inputs.velocityRadPerSec);
-    Logger.recordOutput(
-        "Intake/Profile/ActualVelocityRPM",
-        Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
-    Logger.recordOutput(
-        "Intake/Profile/VelocityErrorRadPerSec",
-        targetVelocityRadPerSec.get() - inputs.velocityRadPerSec);
-    Logger.recordOutput("Intake/ClosedLoop", closedLoop);
+    pivot.periodic();
+    roller.periodic();
   }
 
+  // ==================== Pivot Control ====================
+
+  /** Set the pivot goal angle */
+  public void setPivotGoal(Supplier<Rotation2d> goal) {
+    pivot.setGoal(goal);
+  }
+
+  /** Set the pivot goal angle in radians */
+  public void setPivotGoal(DoubleSupplier goalRad) {
+    pivot.setGoal(goalRad);
+  }
+
+  /** Set pivot to stowed position (90 degrees) */
+  public void stow() {
+    pivot.setGoal(() -> stowedAngle);
+  }
+
+  /** Set pivot to ground/deployed position (0 degrees) */
+  public void deploy() {
+    pivot.setGoal(() -> groundAngle);
+  }
+
+  /** Check if pivot is at goal */
+  @AutoLogOutput(key = "Intake/AtGoal")
+  public boolean isAtGoal() {
+    return pivot.isAtGoal();
+  }
+
+  /** Get current pivot angle */
+  public Rotation2d getPivotAngle() {
+    return pivot.getAngle();
+  }
+
+  /** Home the pivot to stowed position */
+  public void homeToStowed() {
+    pivot.homeToStowed();
+  }
+
+  /** Returns the homing sequence command for the pivot */
+  public Command homingSequence() {
+    return pivot.homingSequence();
+  }
+
+  /** Returns whether the pivot is homed */
+  public boolean isHomed() {
+    return pivot.isHomed();
+  }
+
+  /** Set overrides for pivot */
+  public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
+    pivot.setOverrides(coastOverride, disabledOverride);
+  }
+
+  /** Set E-stop state */
+  public void setEStopped(boolean estopped) {
+    pivot.setEStopped(estopped);
+  }
+
+  /** Check if should E-stop */
+  public boolean shouldEStop() {
+    return pivot.isShouldEStop();
+  }
+
+  // ==================== Roller Control ====================
+
+  /** Run roller at intake velocity */
   public void runIntake() {
-    closedLoop = true;
-    double feedforward = kV.get() * targetVelocityRadPerSec.get();
-    io.runVelocity(targetVelocityRadPerSec.get(), feedforward);
+    roller.runIntake();
   }
 
-  public void runVelocity(double velocityRadPerSec) {
-    closedLoop = true;
-    double feedforward = kV.get() * velocityRadPerSec;
-    io.runVelocity(velocityRadPerSec, feedforward);
+  /** Run roller at eject velocity */
+  public void runEject() {
+    roller.runEject();
   }
 
-  public void runVelocityRPM(double velocityRPM) {
-    runVelocity(Units.rotationsPerMinuteToRadiansPerSecond(velocityRPM));
+  /** Run roller at hold velocity */
+  public void runHold() {
+    roller.runHold();
   }
 
-  public void runVolts(double volts) {
-    closedLoop = false;
-    io.runVolts(volts);
+  /** Run roller at specific velocity (RPS) */
+  public void runRollerVelocity(double velocityRPS) {
+    roller.runVelocity(velocityRPS);
   }
 
-  public void runOpenLoop(double output) {
-    closedLoop = false;
-    io.runOpenLoop(output);
+  /** Stop the roller */
+  public void stopRoller() {
+    roller.stop();
   }
 
-  public void stop() {
-    closedLoop = false;
-    io.stop();
+  /** Check if has game piece */
+  @AutoLogOutput(key = "Intake/HasGamePiece")
+  public boolean hasGamePiece() {
+    return roller.isHasGamePiece();
   }
 
-  public double getVelocityRadPerSec() {
-    return inputs.velocityRadPerSec;
+  // ==================== Commands ====================
+
+  /** Command to deploy intake and run rollers */
+  public Command intakeCommand() {
+    return Commands.runEnd(
+        () -> {
+          deploy();
+          runIntake();
+        },
+        () -> {
+          stow();
+          stopRoller();
+        });
   }
 
-  public double getVelocityRPM() {
-    return Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec);
+  /** Command to eject game piece */
+  public Command ejectCommand() {
+    return Commands.runEnd(this::runEject, this::stopRoller);
   }
 
-  public boolean isMotorConnected() {
-    return motorConnectedDebouncer.calculate(inputs.motorConnected);
+  /** Command to stow the intake */
+  public Command stowCommand() {
+    return Commands.runOnce(this::stow);
+  }
+
+  /** Command to deploy the intake */
+  public Command deployCommand() {
+    return Commands.runOnce(this::deploy);
+  }
+
+  /** Static characterization command for pivot */
+  public Command staticCharacterization(double outputRampRate) {
+    return pivot.staticCharacterization(outputRampRate);
+  }
+
+  // ==================== Direct Access (for testing/characterization) ====================
+
+  public void runVoltsPivot(double volts) {
+    pivot.runVolts(volts);
+  }
+
+  public void runVoltsRoller(double volts) {
+    roller.runVolts(volts);
+  }
+
+  public void runOpenLoopPivot(double amps) {
+    pivot.runOpenLoop(amps);
+  }
+
+  public void setPositionPivot(double degrees) {
+    pivot.setPosition(degrees);
+  }
+
+  public void stopAll() {
+    pivot.stop();
+    roller.stop();
   }
 }

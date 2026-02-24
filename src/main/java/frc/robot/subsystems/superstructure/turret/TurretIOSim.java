@@ -7,10 +7,17 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.math.system.NumericalIntegration;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 public class TurretIOSim implements TurretIO {
   private static final double moi = 0.5;
+
+  // Turret hard stop limits (degrees)
+  private static final double MAX_ANGLE_DEG = 185.0;
+
+  // Hall effect sensor positions (degrees) and detection tolerance
+  private static final double HALL_TOLERANCE_DEG = 2.0;
 
   public static final DCMotor gearbox =
       DCMotor.getKrakenX60Foc(1)
@@ -57,6 +64,25 @@ public class TurretIOSim implements TurretIO {
     inputs.appliedVolts = appliedVolts;
     inputs.currentAmps = Math.abs(inputTorqueCurrent);
     inputs.tempCelsius = 0.0;
+
+    // Simulate hall effect sensors
+    double positionDeg = Units.radiansToDegrees(simState.get(0));
+    inputs.hallEffectState[0] =
+        Math.abs(
+                positionDeg
+                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall)
+            < HALL_TOLERANCE_DEG;
+    inputs.hallEffectState[1] =
+        Math.abs(
+                positionDeg
+                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees
+                        .middleHall)
+            < HALL_TOLERANCE_DEG;
+    inputs.hallEffectState[2] =
+        Math.abs(
+                positionDeg
+                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall)
+            < HALL_TOLERANCE_DEG;
   }
 
   @Override
@@ -118,6 +144,19 @@ public class TurretIOSim implements TurretIO {
 
     simState = VecBuilder.fill(updatedState.get(0, 0), updatedState.get(1, 0));
 
-    // No hard limits - turret uses continuous rotation with wrap-around logic
+    // Apply turret hard stop limits
+    double maxAngleRad = Units.degreesToRadians(MAX_ANGLE_DEG);
+    if (simState.get(0) <= -maxAngleRad) {
+      simState.set(0, 0, -maxAngleRad);
+      if (simState.get(1) < 0) {
+        simState.set(1, 0, 0.0);
+      }
+    }
+    if (simState.get(0) >= maxAngleRad) {
+      simState.set(0, 0, maxAngleRad);
+      if (simState.get(1) > 0) {
+        simState.set(1, 0, 0.0);
+      }
+    }
   }
 }

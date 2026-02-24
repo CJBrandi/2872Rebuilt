@@ -8,28 +8,18 @@ import frc.robot.util.LoggedTunableNumber;
 import lombok.Getter;
 import org.littletonrobotics.junction.Logger;
 
-/**
- * Indexer control with TorqueCurrentFOC velocity control and trapezoidal setpoint profiling. This
- * is not a Subsystem - it's managed by Superstructure.
- */
 public class Indexer {
-
-  // PID gains (output in Amps for TorqueCurrentFOC)
   private static final LoggedTunableNumber kP =
       new LoggedTunableNumber("Superstructure/Indexer/kP", 3.0);
   private static final LoggedTunableNumber kI =
       new LoggedTunableNumber("Superstructure/Indexer/kI", 0.0);
   private static final LoggedTunableNumber kD =
       new LoggedTunableNumber("Superstructure/Indexer/kD", 0.0);
-
-  // Feedforward gains for torque current control (Amps)
   private static final LoggedTunableNumber kS =
       new LoggedTunableNumber("Superstructure/Indexer/kS", 0.0);
-  // kV in Amps per rotation per second
   private static final LoggedTunableNumber kV =
       new LoggedTunableNumber("Superstructure/Indexer/kV", 0.0);
 
-  // Trapezoid profile constraints for velocity setpoint generation
   private static final LoggedTunableNumber maxVelocityRadPerSec =
       new LoggedTunableNumber("Superstructure/Indexer/MaxVelocityRadPerSec", 200.0);
   private static final LoggedTunableNumber maxAccelerationRadPerSec2 =
@@ -56,7 +46,6 @@ public class Indexer {
     setpoint = new TrapezoidProfile.State(0.0, 0.0);
   }
 
-  /** Called by Superstructure.periodic() */
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Superstructure/Indexer", inputs);

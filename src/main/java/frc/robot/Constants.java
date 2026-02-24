@@ -56,14 +56,26 @@ public final class Constants {
   }
 
   public static class IntakeConstants {
-    public static final int canId = 30;
-    public static final String canBus = "";
-    public static final double stepUp = 5;
+    public static final String canBus = "*";
+
+    public static class PivotConstants {
+      public static final int canId = 6;
+    }
+
+    public static class RollerConstants {
+      public static final int canId = 5;
+      public static final int canRangeId = 4;
+    }
   }
 
   public static class ElevatorConstants {
+    public static final int canId = 61;
+    public static final int followerCanId = 62;
+    public static final String canBus = "";
+
     public static final double upPositionMeters = 0.31; // 0.31
     public static final double transitionPositionMeters = 0.270129;
+    public static final double autoPositionMeters = 0.15;
     public static final double downPositionMeters = 0.0; // 0.0
 
     // Simulation constants

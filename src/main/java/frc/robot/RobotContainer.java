@@ -13,6 +13,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
@@ -27,6 +28,13 @@ import frc.robot.subsystems.elevator.Elevator;
 import frc.robot.subsystems.elevator.ElevatorIO;
 import frc.robot.subsystems.elevator.ElevatorIOKraken;
 import frc.robot.subsystems.elevator.ElevatorIOSim;
+import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.PivotIO;
+import frc.robot.subsystems.intake.PivotIOSim;
+import frc.robot.subsystems.intake.PivotIOTalonFX;
+import frc.robot.subsystems.intake.RollerIO;
+import frc.robot.subsystems.intake.RollerIOSim;
+import frc.robot.subsystems.intake.RollerIOTalonFX;
 import frc.robot.subsystems.superstructure.Superstructure;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
 import frc.robot.subsystems.superstructure.indexer.IndexerIOSim;
@@ -53,6 +61,7 @@ public class RobotContainer {
   private final Drive drive;
   private final Superstructure superstructure;
   private final Elevator elevator;
+  private final Intake intake;
   private Vision vision;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -93,7 +102,22 @@ public class RobotContainer {
                         Constants.SuperstructureConstants.TurretConstants.canBus)),
                 new Indexer(new IndexerIOSim()));
 
-        elevator = new Elevator(new ElevatorIOKraken());
+        elevator =
+            new Elevator(
+                new ElevatorIOKraken(
+                    Constants.ElevatorConstants.canId,
+                    Constants.ElevatorConstants.followerCanId,
+                    Constants.ElevatorConstants.canBus));
+
+        intake =
+            new Intake(
+                new PivotIOTalonFX(
+                    Constants.IntakeConstants.PivotConstants.canId,
+                    Constants.IntakeConstants.canBus),
+                new RollerIOTalonFX(
+                    Constants.IntakeConstants.RollerConstants.canId,
+                    Constants.IntakeConstants.RollerConstants.canRangeId,
+                    Constants.IntakeConstants.canBus));
 
         vision =
             new Vision(
@@ -119,6 +143,8 @@ public class RobotContainer {
 
         elevator = new Elevator(new ElevatorIOSim());
 
+        intake = new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
+
         vision =
             new Vision(
                 drive::addVisionMeasurement,
@@ -143,6 +169,8 @@ public class RobotContainer {
                 new Indexer(new IndexerIOSim()));
 
         elevator = new Elevator(new ElevatorIO() {});
+
+        intake = new Intake(new PivotIO() {}, new RollerIO() {});
 
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         break;
@@ -223,6 +251,10 @@ public class RobotContainer {
     autoChooser.addOption(
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
 
+    // Intake characterization
+    autoChooser.addOption(
+        "Intake Pivot Static Characterization", intake.staticCharacterization(2.0));
+
     // Configure the button bindings
     configureButtonBindings();
   }
@@ -235,37 +267,32 @@ public class RobotContainer {
    */
   private void configureButtonBindings() {
     drive.setDefaultCommand(
-        Commands.either(
-            DriveCommands.joystickDrive(
-                drive,
-                () -> -controller.getLeftY(),
-                () -> -controller.getLeftX(),
-                () -> -controller.getRightX()),
-            Commands.none(),
-            this::isHoodHomed));
+        DriveCommands.joystickDrive(
+            drive,
+            () -> -controller.getLeftY(),
+            () -> -controller.getLeftX(),
+            () -> -controller.getRightX()));
 
     controller
         .x()
         .onTrue(
             Commands.runOnce(
-                    () -> {
-                      continuousShootingEnabled = !continuousShootingEnabled;
-                    })
-                .onlyIf(this::isHoodHomed));
+                () -> {
+                  continuousShootingEnabled = !continuousShootingEnabled;
+                }));
 
     superstructure.setDefaultCommand(
         Commands.run(
-                () -> {
-                  if (continuousShootingEnabled) {
-                    double currentTime = Timer.getFPGATimestamp();
-                    if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
-                      superstructure.launchFuelSim();
-                      lastShotTime = currentTime;
-                    }
-                  }
-                },
-                superstructure)
-            .onlyIf(this::isHoodHomed));
+            () -> {
+              if (continuousShootingEnabled) {
+                double currentTime = Timer.getFPGATimestamp();
+                if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
+                  superstructure.launchFuelSim();
+                  lastShotTime = currentTime;
+                }
+              }
+            },
+            superstructure));
 
     controller
         .b()
@@ -281,6 +308,10 @@ public class RobotContainer {
     controller.pov(0).onTrue(elevator.setTarget(Elevator.Target.UP));
     controller.pov(90).onTrue(elevator.setTarget(Elevator.Target.TRANSITION));
     controller.pov(180).onTrue(elevator.setTarget(Elevator.Target.DOWN));
+
+    // Intake control
+    controller.leftBumper().whileTrue(intake.intakeCommand());
+    controller.rightBumper().whileTrue(intake.ejectCommand());
   }
 
   /**
@@ -293,10 +324,10 @@ public class RobotContainer {
   }
 
   public Command getHomingCommand() {
-    return superstructure.getShooter().hoodHomingCommand();
-  }
-
-  public boolean isHoodHomed() {
-    return superstructure.getShooter().isHoodHomed();
+    return Commands.parallel(
+        superstructure.getShooter().hoodHomingCommand(),
+        superstructure.getTurret().homingSequence(),
+        elevator.homingSequence(),
+        intake.homingSequence());
   }
 }

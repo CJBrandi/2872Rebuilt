@@ -58,9 +58,9 @@ public class ElevatorIOKraken implements ElevatorIO {
       new PositionTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final VoltageOut voltageRequest = new VoltageOut(0.0).withUpdateFreqHz(0.0);
 
-  public ElevatorIOKraken() {
-    talon = new TalonFX(61);
-    followerTalon = new TalonFX(62);
+  public ElevatorIOKraken(int canId, int followerCanId, String canBus) {
+    talon = new TalonFX(canId, canBus);
+    followerTalon = new TalonFX(followerCanId, canBus);
     followerTalon.setControl(new Follower(talon.getDeviceID(), MotorAlignmentValue.Aligned));
 
     // Configure motor

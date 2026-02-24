@@ -57,8 +57,7 @@ public class IndexerIOTalonFX implements IndexerIO {
 
     config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
-    config.Slot0 =
-        new Slot0Configs().withKS(0.0).withKV(0.0).withKP(0.0).withKI(0.0).withKD(0.0);
+    config.Slot0 = new Slot0Configs().withKS(0.0).withKV(0.0).withKP(0.0).withKI(0.0).withKD(0.0);
     config.Feedback.SensorToMechanismRatio = REDUCTION;
     config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
     config.TorqueCurrent.PeakReverseTorqueCurrent = -80.0;

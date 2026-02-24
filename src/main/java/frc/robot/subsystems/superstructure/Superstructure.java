@@ -31,7 +31,7 @@ public class Superstructure extends SubsystemBase {
     // Get shooting parameters from calculator
     var params = shotCalculator.getParameters();
 
-    if (shooter.isHoodHomed()) {
+    if (shooter.isHoodHomed() && turret.isHomed()) {
       shooter.setGoals(params.exitVelocity(), params.pitchAngle(), params.pitchVelocity());
       turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
     }
