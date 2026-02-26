@@ -10,13 +10,14 @@ package frc.robot.subsystems.intake;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 
-public class Intake {
+public class Intake extends SubsystemBase {
   // Angle constants: 0° = ground/deployed, 90° = stowed
   public static final Rotation2d minAngle = Rotation2d.fromDegrees(0);
   public static final Rotation2d maxAngle = Rotation2d.fromDegrees(90);
@@ -125,12 +126,6 @@ public class Intake {
   /** Stop the roller */
   public void stopRoller() {
     roller.stop();
-  }
-
-  /** Check if has game piece */
-  @AutoLogOutput(key = "Intake/HasGamePiece")
-  public boolean hasGamePiece() {
-    return roller.isHasGamePiece();
   }
 
   // ==================== Commands ====================

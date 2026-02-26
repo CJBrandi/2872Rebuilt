@@ -7,16 +7,15 @@
 
 package frc.robot.subsystems.intake;
 
-import edu.wpi.first.math.filter.Debouncer;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.Mode;
 import frc.robot.util.LoggedTunableNumber;
-import lombok.Getter;
-import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-public class Roller {
+public class Roller extends SubsystemBase {
   // Tunable numbers
   public static final LoggedTunableNumber intakeVelocity =
       new LoggedTunableNumber("Intake/Roller/IntakeVelocityRPS", 60.0);
@@ -30,13 +29,9 @@ public class Roller {
   // Hardware
   private final RollerIO io;
   private final RollerIOInputsAutoLogged inputs = new RollerIOInputsAutoLogged();
-
-  // Game piece detection
-  @Getter
-  @AutoLogOutput(key = "Intake/Roller/HasGamePiece")
-  private boolean hasGamePiece = false;
-
-  private final Debouncer gamePieceDebouncer = new Debouncer(0.1);
+  private boolean runningProfile = false;
+  private double profileSetpointVelocityRPS = 0.0;
+  private double profileGoalVelocityRPS = 0.0;
 
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
@@ -48,6 +43,7 @@ public class Roller {
     this.io = io;
   }
 
+  @Override
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Intake/Roller", inputs);
@@ -56,14 +52,36 @@ public class Roller {
     canRangeDisconnectedAlert.set(
         !inputs.CANRangeConnected && Constants.getCurrentMode() == Mode.REAL);
 
-    // Update game piece detection from CANRange
-    if (Constants.getCurrentMode() != Mode.SIM) {
-      hasGamePiece = inputs.hasCoral;
+    Logger.recordOutput("Intake/Roller/MeasuredPositionRad", inputs.talonPositionRads);
+    Logger.recordOutput("Intake/Roller/MeasuredVelocityRadPerSec", inputs.talonVelocityRadsPerSec);
+    Logger.recordOutput(
+        "Intake/Roller/MeasuredVelocityRPS",
+        Units.radiansToRotations(inputs.talonVelocityRadsPerSec));
+    Logger.recordOutput("Intake/Roller/RunningProfile", runningProfile);
+
+    if (runningProfile) {
+      profileSetpointVelocityRPS = profileGoalVelocityRPS;
+      Logger.recordOutput("Intake/Roller/Profile/SetpointVelocityRPS", profileSetpointVelocityRPS);
+      Logger.recordOutput(
+          "Intake/Roller/Profile/SetpointVelocityRadPerSec",
+          Units.rotationsToRadians(profileSetpointVelocityRPS));
+      Logger.recordOutput("Intake/Roller/Profile/GoalVelocityRPS", profileGoalVelocityRPS);
+      Logger.recordOutput(
+          "Intake/Roller/Profile/GoalVelocityRadPerSec",
+          Units.rotationsToRadians(profileGoalVelocityRPS));
+    } else {
+      Logger.recordOutput("Intake/Roller/Profile/SetpointVelocityRPS", 0.0);
+      Logger.recordOutput("Intake/Roller/Profile/SetpointVelocityRadPerSec", 0.0);
+      Logger.recordOutput("Intake/Roller/Profile/GoalVelocityRPS", 0.0);
+      Logger.recordOutput("Intake/Roller/Profile/GoalVelocityRadPerSec", 0.0);
     }
   }
 
   /** Run roller at velocity (rotations per second) using torque current control */
   public void runVelocity(double velocityRPS) {
+    runningProfile = true;
+    profileGoalVelocityRPS = velocityRPS;
+    profileSetpointVelocityRPS = velocityRPS;
     io.runVelocity(velocityRPS);
   }
 
@@ -84,16 +102,25 @@ public class Roller {
 
   /** Run roller at voltage */
   public void runVolts(double volts) {
+    runningProfile = false;
+    profileSetpointVelocityRPS = 0.0;
+    profileGoalVelocityRPS = 0.0;
     io.runVolts(volts);
   }
 
   /** Run roller at torque current */
   public void runTorqueCurrent(double current) {
+    runningProfile = false;
+    profileSetpointVelocityRPS = 0.0;
+    profileGoalVelocityRPS = 0.0;
     io.runTorqueCurrent(current);
   }
 
   /** Stop the roller */
   public void stop() {
+    runningProfile = false;
+    profileSetpointVelocityRPS = 0.0;
+    profileGoalVelocityRPS = 0.0;
     io.stop();
   }
 
@@ -110,21 +137,5 @@ public class Roller {
   /** Get current velocity in radians per second */
   public double getVelocityRadsPerSec() {
     return inputs.talonVelocityRadsPerSec;
-  }
-
-  /** Get supply current in amps */
-  public double getSupplyCurrentAmps() {
-    return inputs.talonSupplyCurrentAmps;
-  }
-
-  /** Check for game piece using current spike detection */
-  public boolean detectGamePieceFromCurrent() {
-    return gamePieceDebouncer.calculate(
-        Math.abs(inputs.talonSupplyCurrentAmps) >= currentThreshold.get());
-  }
-
-  /** Set game piece state (for simulation) */
-  public void setHasGamePiece(boolean hasGamePiece) {
-    this.hasGamePiece = hasGamePiece;
   }
 }

@@ -10,10 +10,12 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.system.NumericalIntegration;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 public class IndexerIOSim implements IndexerIO {
   private static final double MOI = 0.003;
+  private static final double RADIANS_PER_ROTATION = Units.rotationsToRadians(1.0);
 
   private static final DCMotor GEARBOX =
       DCMotor.getKrakenX60Foc(1)
@@ -32,7 +34,7 @@ public class IndexerIOSim implements IndexerIO {
 
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
   private double kS = 0.0;
-  private double kV = 0.0;
+  private double kVPerRotationPerSec = 0.0;
   private boolean closedLoop = false;
 
   public IndexerIOSim() {
@@ -46,7 +48,10 @@ public class IndexerIOSim implements IndexerIO {
       update(Constants.loopPeriodSecs);
     } else {
       double setpoint = controller.getSetpoint();
-      double feedforward = kS * Math.signum(setpoint) + kV * setpoint;
+      // Keep FF units consistent with Talon velocity loop:
+      // kV is tuned in amps per rotation/sec, while setpoint here is rad/sec.
+      double feedforward =
+          kS * Math.signum(setpoint) + kVPerRotationPerSec * Units.radiansToRotations(setpoint);
       for (int i = 0; i < (int) (Constants.loopPeriodSecs / (1.0 / 1000.0)); i++) {
         setInputTorqueCurrent(controller.calculate(simState.get(0)) + feedforward);
         update(1.0 / 1000.0);
@@ -87,12 +92,14 @@ public class IndexerIOSim implements IndexerIO {
   @Override
   public void setFF(double kS, double kV) {
     this.kS = kS;
-    this.kV = kV;
+    this.kVPerRotationPerSec = kV;
   }
 
   @Override
   public void setPID(double kP, double kI, double kD) {
-    controller.setPID(kP, kI, kD);
+    // Talon velocity gains are per rotation/sec. Convert to per rad/sec for the sim controller.
+    controller.setPID(
+        kP / RADIANS_PER_ROTATION, kI / RADIANS_PER_ROTATION, kD / RADIANS_PER_ROTATION);
   }
 
   @Override

@@ -19,32 +19,61 @@ import org.littletonrobotics.junction.Logger;
 
 public class Turret {
 
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Turret/kP", 80);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Turret/kD", 0);
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Turret/kS", 0.4);
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Turret/kV", 0.0);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Turret/kP");
+  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Turret/kD");
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Turret/kS");
+  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Turret/kV");
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Turret/MaxVelocityDegreesPerSec", 45);
+      new LoggedTunableNumber("Turret/MaxVelocityDegreesPerSec");
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Turret/MaxAccelerationDegreesPerSec2", 90);
+      new LoggedTunableNumber("Turret/MaxAccelerationDegreesPerSec2");
   private static final LoggedTunableNumber homingVolts =
-      new LoggedTunableNumber("Turret/HomingVolts", 2.0);
-  private static final LoggedTunableNumber homingStallVelocityThresh =
-      new LoggedTunableNumber("Turret/HomingStallVelocityThreshRadPerSec", 0.1);
-  private static final LoggedTunableNumber homingStallTimeSecs =
-      new LoggedTunableNumber("Turret/HomingStallTimeSecs", 0.25);
+      new LoggedTunableNumber("Turret/HomingVolts");
+  private static final LoggedTunableNumber hallBandWidthDeg =
+      new LoggedTunableNumber("Turret/HallBandWidthDeg");
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
-      new LoggedTunableNumber("Turret/StaticCharacterizationVelocityThreshRadPerSec", 0.1);
+      new LoggedTunableNumber("Turret/StaticCharacterizationVelocityThreshRadPerSec");
   private static final LoggedTunableNumber extraLimitDegrees =
-      new LoggedTunableNumber("Turret/ExtraLimitDegrees", 5.0);
+      new LoggedTunableNumber("Turret/ExtraLimitDegrees");
 
   private static final double BASE_LIMIT_DEGREES = 180.0;
+  private static final double STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS = 10.0;
 
   // Manual mode tunables
   private static final LoggedTunableNumber manualModeEnabled =
-      new LoggedTunableNumber("Manual/Enabled", 0.0);
+      new LoggedTunableNumber("Manual/Enabled");
   private static final LoggedTunableNumber manualAngleDeg =
-      new LoggedTunableNumber("Manual/YawDeg", 0.0);
+      new LoggedTunableNumber("Manual/YawDeg");
+  private static final LoggedTunableNumber disableHoming =
+      new LoggedTunableNumber("Turret/DisableHoming");
+
+  static {
+    switch (Constants.getCurrentMode()) {
+      case REAL -> {
+        kP.initDefault(300);
+        kD.initDefault(0);
+        kS.initDefault(0.2);
+        kV.initDefault(0.0);
+        maxVelocityDegPerSec.initDefault(360);
+        maxAccelerationDegPerSec2.initDefault(720);
+      }
+      case SIM, REPLAY -> {
+        kP.initDefault(8000);
+        kD.initDefault(1.0);
+        kS.initDefault(0.2);
+        kV.initDefault(0.0);
+        maxVelocityDegPerSec.initDefault(9000);
+        maxAccelerationDegPerSec2.initDefault(18000);
+      }
+    }
+    homingVolts.initDefault(0.2);
+    hallBandWidthDeg.initDefault(36.5);
+    staticCharacterizationVelocityThresh.initDefault(0.1);
+    extraLimitDegrees.initDefault(5.0);
+    disableHoming.initDefault(1.0);
+    manualModeEnabled.initDefault(0.0);
+    manualAngleDeg.initDefault(0.0);
+  }
 
   private final TurretIO turretIO;
   private final TurretIOInputsAutoLogged inputs = new TurretIOInputsAutoLogged();
@@ -67,8 +96,8 @@ public class Turret {
   @AutoLogOutput(key = "Turret/HomedPositionRad")
   private double homedPosition = 0.0;
 
-  private int homingDirection = 1; // 1 = positive, -1 = negative
-  private Debouncer homingStallDebouncer = new Debouncer(0.25, Debouncer.DebounceType.kRising);
+  @AutoLogOutput(key = "Turret/StaticCharacterizationActive")
+  private boolean staticCharacterizationActive = false;
 
   private boolean closedLoop = false;
 
@@ -132,14 +161,18 @@ public class Turret {
                 Timer.getFPGATimestamp(), inputs.motorEncoderPosition));
 
     // Manual mode - use tunable angle as target
-    if (manualModeEnabled.get() > 0.5) {
+    if (manualModeEnabled.get() > 0.5 && !staticCharacterizationActive) {
       setTargetTurretAngle(Rotation2d.fromDegrees(manualAngleDeg.get()));
     }
 
     // Run closed loop control if enabled, homed, and we have a target
     // Manual mode disables automatic field-relative calculations
     boolean manualMode = manualModeEnabled.get() > 0.5;
-    if (closedLoop && homed && targetFieldRelativeAngle != null && !manualMode) {
+    if (closedLoop
+        && homed
+        && !staticCharacterizationActive
+        && targetFieldRelativeAngle != null
+        && !manualMode) {
       // Convert field-relative angle to robot-relative angle
       double robotAngleRad = RobotState.getInstance().getRobotPose().getRotation().getRadians();
       double robotAngularVelocity =
@@ -172,7 +205,7 @@ public class Turret {
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", robotRelativeGoalVelocity);
-    } else if (closedLoop && homed && targetTurretAngle != null) {
+    } else if (closedLoop && homed && !staticCharacterizationActive && targetTurretAngle != null) {
       // Direct turret angle control (no field-relative conversion)
       double bestAngle = findBestAngleWithinLimits(targetTurretAngle.getRadians());
       lastGoalAngle = bestAngle;
@@ -195,6 +228,8 @@ public class Turret {
     } else {
       atGoal = false;
     }
+
+    Logger.recordOutput("Turret/Homed", homed);
 
     logState();
     TurretVisualizer.update(setpoint.position);
@@ -378,52 +413,122 @@ public class Turret {
     Logger.recordOutput("Turret/Safety/ResetAppliedDeg", safeDegrees);
   }
 
+  private double getHallCenterDegForIndex(int sensorIndex) {
+    return switch (sensorIndex) {
+      case 0 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall;
+      case 1 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.middleHall;
+      case 2 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall;
+      default -> 0.0;
+    };
+  }
+
+  private void resetHallEdgeCapture(HallEdgeCaptureState captureState) {
+    System.arraycopy(
+        inputs.hallEffectState,
+        0,
+        captureState.previousTriggered,
+        0,
+        inputs.hallEffectState.length);
+    captureState.edgeSensorIndex = -1;
+    captureState.enteredBand = false;
+    captureState.edgeAngleDeg = Double.NaN;
+    captureState.inferredCenterDeg = Double.NaN;
+    captureState.inferredPositionDeg = Double.NaN;
+  }
+
   /** Returns whether the motor is connected. */
   public boolean isMotorConnected() {
     return motorConnectedDebouncer.calculate(inputs.motorConnected);
   }
 
+  private static class HallEdgeCaptureState {
+    boolean[] previousTriggered = new boolean[3];
+    int edgeSensorIndex = -1;
+    boolean enteredBand = false;
+    double edgeAngleDeg = Double.NaN;
+    double inferredCenterDeg = Double.NaN;
+    double inferredPositionDeg = Double.NaN;
+  }
+
   public Command homingSequence() {
+    if (disableHoming.get() > 0.5) {
+      return Commands.runOnce(
+          () -> {
+            homed = true;
+            Logger.recordOutput("Turret/Homing/Disabled", true);
+          });
+    }
+
+    final HallEdgeCaptureState captureState = new HallEdgeCaptureState();
     return Commands.startRun(
             () -> {
               closedLoop = false;
               homed = false;
-              homingDirection = 1;
-              homingStallDebouncer =
-                  new Debouncer(homingStallTimeSecs.get(), Debouncer.DebounceType.kRising);
-              homingStallDebouncer.calculate(false);
+              homedPosition = 0.0;
+              Logger.recordOutput("Turret/Homing/Disabled", false);
+              resetHallEdgeCapture(captureState);
             },
             () -> {
-              turretIO.runVolts(homingVolts.get() * homingDirection);
+              turretIO.runVolts(homingVolts.get());
 
-              // Check hall effect sensors
-              if (inputs.hallEffectState[0]) {
-                homed = true;
-                homedPosition =
-                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall;
-              } else if (inputs.hallEffectState[1]) {
-                homed = true;
-                homedPosition =
-                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.middleHall;
-              } else if (inputs.hallEffectState[2]) {
-                homed = true;
-                homedPosition =
-                    Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall;
+              double currentAngleDeg = inputs.motorEncoderPosition.getDegrees();
+
+              double motionSign = Math.signum(homingVolts.get());
+              if (motionSign == 0.0) {
+                motionSign = 1.0;
               }
 
-              // Check for stall (hit limit without finding sensor) and reverse direction
-              boolean stalled =
-                  homingStallDebouncer.calculate(
-                      Math.abs(inputs.velocityRadPerSec) < homingStallVelocityThresh.get());
-              if (stalled && !homed) {
-                homingDirection *= -1;
-                homingStallDebouncer =
-                    new Debouncer(homingStallTimeSecs.get(), Debouncer.DebounceType.kRising);
-                homingStallDebouncer.calculate(false);
+              double halfBandWidthDeg = 0.5 * Math.abs(hallBandWidthDeg.get());
+              for (int i = 0; i < inputs.hallEffectState.length; i++) {
+                boolean wasTriggered = captureState.previousTriggered[i];
+                boolean nowTriggered = inputs.hallEffectState[i];
+                if (wasTriggered == nowTriggered) {
+                  continue;
+                }
+
+                boolean enteredBand = !wasTriggered && nowTriggered;
+                double boundaryOffsetSign;
+                if (motionSign > 0.0) {
+                  boundaryOffsetSign = enteredBand ? -1.0 : 1.0;
+                } else {
+                  boundaryOffsetSign = enteredBand ? 1.0 : -1.0;
+                }
+
+                double inferredCenterDeg = getHallCenterDegForIndex(i);
+                double inferredPositionDeg =
+                    inferredCenterDeg + boundaryOffsetSign * halfBandWidthDeg;
+
+                captureState.edgeSensorIndex = i;
+                captureState.enteredBand = enteredBand;
+                captureState.edgeAngleDeg = currentAngleDeg;
+                captureState.inferredCenterDeg = inferredCenterDeg;
+                captureState.inferredPositionDeg = inferredPositionDeg;
+
+                homedPosition = inferredPositionDeg;
+                homed = true;
+                break;
               }
 
-              Logger.recordOutput("Turret/Homing/Direction", homingDirection);
-              Logger.recordOutput("Turret/Homing/Stalled", stalled);
+              System.arraycopy(
+                  inputs.hallEffectState,
+                  0,
+                  captureState.previousTriggered,
+                  0,
+                  inputs.hallEffectState.length);
+
+              Logger.recordOutput("Turret/Homing/TrackedSensorIndex", captureState.edgeSensorIndex);
+              Logger.recordOutput("Turret/Homing/WaitingForClear", false);
+              Logger.recordOutput("Turret/Homing/CommandVolts", homingVolts.get());
+              Logger.recordOutput(
+                  "Turret/Homing/EntryEdgeDeg",
+                  captureState.enteredBand ? captureState.edgeAngleDeg : Double.NaN);
+              Logger.recordOutput(
+                  "Turret/Homing/ExitEdgeDeg",
+                  captureState.enteredBand ? Double.NaN : captureState.edgeAngleDeg);
+              Logger.recordOutput(
+                  "Turret/Homing/MeasuredCenterDeg", captureState.inferredCenterDeg);
+              Logger.recordOutput("Turret/Homing/EnteredBandEdge", captureState.enteredBand);
+              Logger.recordOutput("Turret/Homing/CalculatedPositionDeg", homedPosition);
             })
         .until(() -> homed)
         .andThen(
@@ -439,39 +544,47 @@ public class Turret {
 
   /** State class for static characterization. */
   private static class StaticCharacterizationState {
-    public double characterizationVolts = 0.0;
+    public double characterizationCurrentAmps = 0.0;
   }
 
   /**
-   * Creates a command for static characterization that ramps voltage until motion is detected.
+   * Creates a command for static characterization that ramps current until motion is detected.
    *
-   * @param voltageRampRateVoltsPerSec Rate at which to increase voltage (volts per second)
+   * @param currentRampRateAmpsPerSec Rate at which to increase current (amps per second)
    * @return Command that runs the characterization
    */
-  public Command staticCharacterization(double voltageRampRateVoltsPerSec) {
+  public Command staticCharacterization(double currentRampRateAmpsPerSec) {
     final StaticCharacterizationState state = new StaticCharacterizationState();
     Timer timer = new Timer();
     return Commands.startRun(
             () -> {
+              staticCharacterizationActive = true;
               closedLoop = false;
               timer.restart();
             },
             () -> {
-              state.characterizationVolts = voltageRampRateVoltsPerSec * timer.get();
-              System.out.println("Turret Voltage Ramp: " + state.characterizationVolts);
-              turretIO.runVolts(state.characterizationVolts);
+              // Keep closed-loop off even if other code paths set targets while characterizing.
+              closedLoop = false;
+              state.characterizationCurrentAmps =
+                  MathUtil.clamp(
+                      currentRampRateAmpsPerSec * timer.get(),
+                      -STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS,
+                      STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS);
+              System.out.println("Turret Current Ramp: " + state.characterizationCurrentAmps);
+              turretIO.runCurrent(state.characterizationCurrentAmps);
               Logger.recordOutput(
-                  "Turret/StaticCharacterizationVolts", state.characterizationVolts);
+                  "Turret/StaticCharacterizationCurrentAmps", state.characterizationCurrentAmps);
             })
         .until(
             () -> Math.abs(inputs.velocityRadPerSec) >= staticCharacterizationVelocityThresh.get())
         .finallyDo(
             () -> {
+              staticCharacterizationActive = false;
               closedLoop = true;
               timer.stop();
               turretIO.stop();
               Logger.recordOutput(
-                  "Turret/CharacterizationResultVolts", state.characterizationVolts);
+                  "Turret/CharacterizationResultCurrentAmps", state.characterizationCurrentAmps);
             });
   }
 }

@@ -16,13 +16,13 @@ public class Flywheel {
   // Wheel radius in meters (4 inch diameter wheels)
   private static final double WHEEL_RADIUS = Units.inchesToMeters(2.0);
 
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Flywheel/kP", 3.0);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Flywheel/kP", 10);
   private static final LoggedTunableNumber kI = new LoggedTunableNumber("Shooter/Flywheel/kI", 0.1);
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/Flywheel/kD", 0.0);
   // Feedforward gains for torque current control (Amps)
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Flywheel/kS", 7.0);
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Flywheel/kS", 0.0);
   // kV in Amps per rotation per second
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Shooter/Flywheel/kV", 0.2);
+  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Shooter/Flywheel/kV", 0.3);
 
   // Efficiency coefficient: accounts for friction between wheels and ball
   // exitVelocity = wheelSurfaceVelocity * efficiency

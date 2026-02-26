@@ -19,23 +19,23 @@ import java.util.Set;
 import org.photonvision.PhotonCamera;
 
 /** IO implementation for real PhotonVision hardware. */
-public class VisionIOPhotonVision implements VisionIO {
+public class TagIOPhotonVision implements TagIO {
   protected final PhotonCamera camera;
   protected final Transform3d robotToCamera;
 
   /**
-   * Creates a new VisionIOPhotonVision.
+   * Creates a new TagIOPhotonVision.
    *
    * @param name The configured name of the camera.
    * @param robotToCamera The 3D position of the camera relative to the robot.
    */
-  public VisionIOPhotonVision(String name, Transform3d robotToCamera) {
+  public TagIOPhotonVision(String name, Transform3d robotToCamera) {
     camera = new PhotonCamera(name);
     this.robotToCamera = robotToCamera;
   }
 
   @Override
-  public void updateInputs(VisionIOInputs inputs) {
+  public void updateInputs(TagIOInputs inputs) {
     inputs.connected = camera.isConnected();
 
     // Read new camera observations

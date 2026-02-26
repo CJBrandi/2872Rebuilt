@@ -3,6 +3,7 @@ package frc.robot.util;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -28,18 +29,14 @@ public class ShotCalculator {
   private static final double LOOP_PERIOD_SECS = 0.02; // 20ms
   private static final double EPSILON = 1e-9;
 
-  private static final LoggedTunableNumber newtonMaxIterations =
-      new LoggedTunableNumber("ShotCalculator/NewtonMaxIterations", 8.0);
-  private static final LoggedTunableNumber newtonResidualToleranceMeters =
-      new LoggedTunableNumber("ShotCalculator/NewtonResidualToleranceMeters", 0.001);
-  private static final LoggedTunableNumber newtonDistanceToleranceMeters =
-      new LoggedTunableNumber("ShotCalculator/NewtonDistanceToleranceMeters", 0.001);
-  private static final LoggedTunableNumber newtonDerivativeStepMeters =
-      new LoggedTunableNumber("ShotCalculator/NewtonDerivativeStepMeters", 0.05);
-  private static final LoggedTunableNumber newtonMinDerivative =
-      new LoggedTunableNumber("ShotCalculator/NewtonMinDerivative", 0.05);
-  private static final LoggedTunableNumber newtonMaxStepMeters =
-      new LoggedTunableNumber("ShotCalculator/NewtonMaxStepMeters", 1.0);
+  private static final LoggedTunableNumber accelerationFilterTimeConstantSecs =
+      new LoggedTunableNumber("ShotCalculator/AccelerationFilterTimeConstantSecs", 0.12);
+  private static final LoggedTunableNumber accelerationCompensationGain =
+      new LoggedTunableNumber("ShotCalculator/AccelerationCompensationGain", 0.5);
+  private static final LoggedTunableNumber maxAccelerationCompensationMps2 =
+      new LoggedTunableNumber("ShotCalculator/MaxAccelerationCompensationMps2", 3.0);
+  private static final LoggedTunableNumber releasePredictionSecs =
+      new LoggedTunableNumber("ShotCalculator/ReleasePredictionSecs", 0.06);
 
   private static final LoggedTunableNumber stabilityGateEnabled =
       new LoggedTunableNumber("ShotCalculator/StabilityGateEnabled", 1.0);
@@ -71,16 +68,8 @@ public class ShotCalculator {
       double pitchVelocity,
       double exitVelocity) {}
 
-  private record NewtonDistanceSolution(
-      double distanceMeters, int iterations, boolean converged, double residualMeters) {}
-
   private record CompensationSolution(
-      Translation2d compensatedPosition,
-      double lookaheadDistance,
-      int iterations,
-      boolean converged,
-      boolean usedNewton,
-      double residualMeters) {}
+      Translation2d compensatedPosition, double lookaheadDistance) {}
 
   // Lookup tables keyed by distance (meters)
   private final InterpolatingDoubleTreeMap flightTimeMap = new InterpolatingDoubleTreeMap();
@@ -96,8 +85,6 @@ public class ShotCalculator {
   @Getter private boolean shootOnMoveEnabled = true;
 
   @Getter private boolean shotStable = false;
-  @Getter private boolean lastCompensationConverged = false;
-  @Getter private boolean lastCompensationUsedNewton = false;
 
   // Filters for velocity calculation
   private final LinearFilter turretAngleFilter =
@@ -108,6 +95,8 @@ public class ShotCalculator {
   // State for velocity calculation
   private Rotation2d lastTurretAngle = null;
   private double lastPitchAngle = Double.NaN;
+  private Translation3d lastShooterFieldVelocity = null;
+  private Translation3d filteredShooterFieldAcceleration = new Translation3d();
 
   // Robot to turret offset (adjust for your robot)
   private final Translation2d robotToTurret = new Translation2d(0, 0);
@@ -171,16 +160,10 @@ public class ShotCalculator {
     }
   }
 
-  /**
-   * Calculates shot parameters for the current robot state using time-of-flight compensation.
-   *
-   * @return Shot parameters including turret angle, pitch angle, and exit velocity
-   */
+  /** Calculates shot parameters for the current robot state. */
   public ShootingParameters getParameters() {
     if (!loaded) {
       shotStable = false;
-      lastCompensationConverged = false;
-      lastCompensationUsedNewton = false;
       return new ShootingParameters(Rotation2d.kZero, 0.0, 0.0, 0.0, 0.0);
     }
 
@@ -190,17 +173,14 @@ public class ShotCalculator {
     Translation2d targetPosition = getAllianceTransposedTargetPosition();
     Translation2d turretPosition =
         robotPose.getTranslation().plus(robotToTurret.rotateBy(robotPose.getRotation()));
+    Translation3d shooterFieldVelocity =
+        ShotVectorCompensator.calculateShooterFieldVelocity(
+            robotVelocity, robotPose.getRotation(), robotToTurret);
+    Translation3d shooterFieldAcceleration = estimateShooterFieldAcceleration(shooterFieldVelocity);
 
-    // Vector-only shoot-on-move: do not apply distance/time lookahead.
-    // We keep target distance based on current geometry and compensate purely by velocity
-    // subtraction.
     double currentDistance = targetPosition.getDistance(turretPosition);
     CompensationSolution compensationSolution =
-        new CompensationSolution(
-            turretPosition, clampDistance(currentDistance), 0, true, false, 0.0);
-
-    lastCompensationConverged = compensationSolution.converged();
-    lastCompensationUsedNewton = compensationSolution.usedNewton();
+        new CompensationSolution(turretPosition, clampDistance(currentDistance));
 
     Rotation2d lookupYaw =
         normalizeTo0To2Pi(
@@ -208,11 +188,17 @@ public class ShotCalculator {
     Translation3d lookupVector = getLookupVector(compensationSolution.lookaheadDistance());
     Translation3d requiredFieldVelocity =
         ShotVectorCompensator.orientLookupVectorToField(lookupVector, lookupYaw);
+    double tof = flightTimeMap.get(compensationSolution.lookaheadDistance());
+    double predictionTimeSecs = Math.max(0.0, releasePredictionSecs.get());
+    double accelGain = Math.max(0.0, accelerationCompensationGain.get());
+    Translation3d weightedAcceleration = shooterFieldAcceleration.times(accelGain);
+    Translation3d predictedShooterFieldVelocity =
+        shooterFieldVelocity.plus(weightedAcceleration.times(predictionTimeSecs));
 
     ShotVectorCompensator.CompensatedShot shot =
         shootOnMoveEnabled
-            ? ShotVectorCompensator.compensateForRobotMotion(
-                requiredFieldVelocity, robotVelocity, robotPose.getRotation(), robotToTurret)
+            ? ShotVectorCompensator.compensateWithShooterFieldVelocity(
+                requiredFieldVelocity, predictedShooterFieldVelocity)
             : ShotVectorCompensator.fromShooterRelativeVector(requiredFieldVelocity);
 
     Rotation2d turretAngle = normalizeTo0To2Pi(shot.yaw());
@@ -233,25 +219,19 @@ public class ShotCalculator {
 
     shotStable =
         evaluateStabilityGate(
-            lookupYaw,
-            shot,
-            turretPosition,
-            compensationSolution.compensatedPosition(),
-            compensationSolution);
+            lookupYaw, shot, turretPosition, compensationSolution.compensatedPosition());
 
     Logger.recordOutput("ShotCalculator/ShootOnMoveEnabled", shootOnMoveEnabled);
     Logger.recordOutput("ShotCalculator/VectorLookupLoaded", loaded);
     Logger.recordOutput("ShotCalculator/ShotStable", shotStable);
-    Logger.recordOutput("ShotCalculator/CompensationConverged", lastCompensationConverged);
-    Logger.recordOutput("ShotCalculator/CompensationUsedNewton", lastCompensationUsedNewton);
-    Logger.recordOutput("ShotCalculator/CompensationIterations", compensationSolution.iterations());
-    Logger.recordOutput(
-        "ShotCalculator/CompensationResidualMeters", compensationSolution.residualMeters());
     Logger.recordOutput(
         "ShotCalculator/CompensatedPosition",
         new Pose2d(compensationSolution.compensatedPosition(), turretAngle));
     Logger.recordOutput(
         "ShotCalculator/TurretToTargetDistance", compensationSolution.lookaheadDistance());
+    Logger.recordOutput("ShotCalculator/TimeOfFlightSec", tof);
+    Logger.recordOutput("ShotCalculator/ReleasePredictionSec", predictionTimeSecs);
+    Logger.recordOutput("ShotCalculator/AccelerationCompensationGain", accelGain);
     Logger.recordOutput("ShotCalculator/PitchAngleDeg", Math.toDegrees(pitchAngle));
     Logger.recordOutput("ShotCalculator/ExitVelocity", exitVelocity);
     Logger.recordOutput(
@@ -264,9 +244,16 @@ public class ShotCalculator {
     Logger.recordOutput(
         "ShotCalculator/ShooterFieldVelocity",
         new double[] {
-          shot.shooterFieldVelocity().getX(),
-          shot.shooterFieldVelocity().getY(),
-          shot.shooterFieldVelocity().getZ()
+          predictedShooterFieldVelocity.getX(),
+          predictedShooterFieldVelocity.getY(),
+          predictedShooterFieldVelocity.getZ()
+        });
+    Logger.recordOutput(
+        "ShotCalculator/ShooterFieldAcceleration",
+        new double[] {
+          shooterFieldAcceleration.getX(),
+          shooterFieldAcceleration.getY(),
+          shooterFieldAcceleration.getZ()
         });
     Logger.recordOutput(
         "ShotCalculator/CommandedShooterVelocity",
@@ -280,107 +267,11 @@ public class ShotCalculator {
         turretAngle, turretVelocity, pitchAngle, pitchVelocity, exitVelocity);
   }
 
-  private CompensationSolution solveCompensation(
-      Translation2d turretPosition,
-      Translation2d targetPosition,
-      Translation3d turretFieldVelocity,
-      double initialDistance) {
-    if (!shootOnMoveEnabled) {
-      return new CompensationSolution(
-          turretPosition, clampDistance(initialDistance), 0, true, false, 0.0);
-    }
-
-    NewtonDistanceSolution newtonSolution =
-        solveDistanceNewton(turretPosition, targetPosition, turretFieldVelocity, initialDistance);
-    double lookaheadDistance = newtonSolution.distanceMeters();
-    double tof = flightTimeMap.get(lookaheadDistance);
-    Translation2d compensatedPosition =
-        turretPosition.plus(
-            new Translation2d(turretFieldVelocity.getX() * tof, turretFieldVelocity.getY() * tof));
-
-    return new CompensationSolution(
-        compensatedPosition,
-        lookaheadDistance,
-        newtonSolution.iterations(),
-        newtonSolution.converged(),
-        true,
-        newtonSolution.residualMeters());
-  }
-
-  private NewtonDistanceSolution solveDistanceNewton(
-      Translation2d turretPosition,
-      Translation2d targetPosition,
-      Translation3d turretFieldVelocity,
-      double initialDistance) {
-    int maxIterations = Math.max(1, (int) Math.round(newtonMaxIterations.get()));
-    double residualTolerance = Math.max(1e-6, newtonResidualToleranceMeters.get());
-    double distanceTolerance = Math.max(1e-6, newtonDistanceToleranceMeters.get());
-    double minDerivative = Math.max(1e-4, newtonMinDerivative.get());
-    double maxStepMeters = Math.max(0.01, newtonMaxStepMeters.get());
-
-    double distance = clampDistance(initialDistance);
-    int iterations = 0;
-    boolean converged = false;
-    double residualMeters =
-        Math.abs(
-            computeDistanceResidual(distance, turretPosition, targetPosition, turretFieldVelocity));
-
-    for (int i = 0; i < maxIterations; i++) {
-      iterations = i + 1;
-
-      double tof = flightTimeMap.get(distance);
-      Translation2d predicted =
-          turretPosition.plus(
-              new Translation2d(
-                  turretFieldVelocity.getX() * tof, turretFieldVelocity.getY() * tof));
-      Translation2d delta = targetPosition.minus(predicted);
-      double range = delta.getNorm();
-
-      double f = distance - range;
-      residualMeters = Math.abs(f);
-      if (residualMeters <= residualTolerance) {
-        converged = true;
-        break;
-      }
-
-      double dtdd = flightTimeDerivative(distance);
-      double dot =
-          delta.getX() * turretFieldVelocity.getX() + delta.getY() * turretFieldVelocity.getY();
-      double derivative = 1.0 + (dot / Math.max(range, EPSILON)) * dtdd;
-
-      if (!Double.isFinite(derivative) || Math.abs(derivative) < minDerivative) {
-        break;
-      }
-
-      double step = f / derivative;
-      step = Math.max(-maxStepMeters, Math.min(maxStepMeters, step));
-
-      double nextDistance = clampDistance(distance - step);
-      if (!Double.isFinite(nextDistance)) {
-        break;
-      }
-      if (Math.abs(nextDistance - distance) <= distanceTolerance) {
-        distance = nextDistance;
-        residualMeters =
-            Math.abs(
-                computeDistanceResidual(
-                    distance, turretPosition, targetPosition, turretFieldVelocity));
-        converged = residualMeters <= residualTolerance;
-        break;
-      }
-
-      distance = nextDistance;
-    }
-
-    return new NewtonDistanceSolution(distance, iterations, converged, residualMeters);
-  }
-
   private boolean evaluateStabilityGate(
       Rotation2d lookupYaw,
       ShotVectorCompensator.CompensatedShot shot,
       Translation2d turretPosition,
-      Translation2d compensatedPosition,
-      CompensationSolution compensationSolution) {
+      Translation2d compensatedPosition) {
     if (!shootOnMoveEnabled || stabilityGateEnabled.get() < 0.5) {
       return true;
     }
@@ -399,8 +290,7 @@ public class ShotCalculator {
     double maxPitchRad = Math.toRadians(stabilityMaxPitchDeg.get());
 
     boolean stable =
-        compensationSolution.converged()
-            && Double.isFinite(shot.exitVelocity())
+        Double.isFinite(shot.exitVelocity())
             && Double.isFinite(shot.pitch())
             && robotToShotRatio <= stabilityMaxRobotToShotRatio.get()
             && leadAngleDeg <= stabilityMaxLeadAngleDeg.get()
@@ -419,26 +309,34 @@ public class ShotCalculator {
     return stable;
   }
 
-  private double flightTimeDerivative(double distance) {
-    double derivativeStep = Math.max(0.001, newtonDerivativeStepMeters.get());
-    double low = clampDistance(distance - derivativeStep);
-    double high = clampDistance(distance + derivativeStep);
-    double span = high - low;
-    if (span < EPSILON) return 0.0;
-    return (flightTimeMap.get(high) - flightTimeMap.get(low)) / span;
-  }
+  private Translation3d estimateShooterFieldAcceleration(Translation3d shooterFieldVelocity) {
+    double timeConstant = Math.max(LOOP_PERIOD_SECS, accelerationFilterTimeConstantSecs.get());
+    double alpha = LOOP_PERIOD_SECS / (timeConstant + LOOP_PERIOD_SECS);
 
-  private double computeDistanceResidual(
-      double distance,
-      Translation2d turretPosition,
-      Translation2d targetPosition,
-      Translation3d turretFieldVelocity) {
-    double clampedDistance = clampDistance(distance);
-    double tof = flightTimeMap.get(clampedDistance);
-    Translation2d predicted =
-        turretPosition.plus(
-            new Translation2d(turretFieldVelocity.getX() * tof, turretFieldVelocity.getY() * tof));
-    return clampedDistance - targetPosition.getDistance(predicted);
+    if (lastShooterFieldVelocity == null) {
+      lastShooterFieldVelocity = shooterFieldVelocity;
+      filteredShooterFieldAcceleration = new Translation3d();
+      return filteredShooterFieldAcceleration;
+    }
+
+    Translation3d rawAcceleration =
+        shooterFieldVelocity.minus(lastShooterFieldVelocity).div(LOOP_PERIOD_SECS);
+    double maxAccel = Math.max(0.0, maxAccelerationCompensationMps2.get());
+    rawAcceleration =
+        new Translation3d(
+            MathUtil.clamp(rawAcceleration.getX(), -maxAccel, maxAccel),
+            MathUtil.clamp(rawAcceleration.getY(), -maxAccel, maxAccel),
+            MathUtil.clamp(rawAcceleration.getZ(), -maxAccel, maxAccel));
+    filteredShooterFieldAcceleration =
+        new Translation3d(
+            filteredShooterFieldAcceleration.getX()
+                + alpha * (rawAcceleration.getX() - filteredShooterFieldAcceleration.getX()),
+            filteredShooterFieldAcceleration.getY()
+                + alpha * (rawAcceleration.getY() - filteredShooterFieldAcceleration.getY()),
+            filteredShooterFieldAcceleration.getZ()
+                + alpha * (rawAcceleration.getZ() - filteredShooterFieldAcceleration.getZ()));
+    lastShooterFieldVelocity = shooterFieldVelocity;
+    return filteredShooterFieldAcceleration;
   }
 
   private double clampDistance(double distance) {

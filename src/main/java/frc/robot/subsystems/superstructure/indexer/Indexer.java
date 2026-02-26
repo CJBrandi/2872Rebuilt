@@ -2,6 +2,9 @@ package frc.robot.subsystems.superstructure.indexer;
 
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.Constants;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
@@ -10,20 +13,55 @@ import org.littletonrobotics.junction.Logger;
 
 public class Indexer {
   private static final LoggedTunableNumber kP =
-      new LoggedTunableNumber("Superstructure/Indexer/kP", 3.0);
+      new LoggedTunableNumber("Superstructure/Indexer/kP");
   private static final LoggedTunableNumber kI =
-      new LoggedTunableNumber("Superstructure/Indexer/kI", 0.0);
+      new LoggedTunableNumber("Superstructure/Indexer/kI");
   private static final LoggedTunableNumber kD =
-      new LoggedTunableNumber("Superstructure/Indexer/kD", 0.0);
+      new LoggedTunableNumber("Superstructure/Indexer/kD");
+  // Talon velocity-loop units:
+  // kP/kI/kD are amps per (mechanism rotation/sec) error terms.
   private static final LoggedTunableNumber kS =
-      new LoggedTunableNumber("Superstructure/Indexer/kS", 0.0);
+      new LoggedTunableNumber("Superstructure/Indexer/kS");
+  // kV is amps per mechanism rotation/sec.
   private static final LoggedTunableNumber kV =
-      new LoggedTunableNumber("Superstructure/Indexer/kV", 0.0);
+      new LoggedTunableNumber("Superstructure/Indexer/kV");
 
   private static final LoggedTunableNumber maxVelocityRadPerSec =
-      new LoggedTunableNumber("Superstructure/Indexer/MaxVelocityRadPerSec", 200.0);
+      new LoggedTunableNumber("Superstructure/Indexer/MaxVelocityRadPerSec");
   private static final LoggedTunableNumber maxAccelerationRadPerSec2 =
-      new LoggedTunableNumber("Superstructure/Indexer/MaxAccelerationRadPerSec2", 400.0);
+      new LoggedTunableNumber("Superstructure/Indexer/MaxAccelerationRadPerSec2");
+  private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
+      new LoggedTunableNumber(
+          "Superstructure/Indexer/StaticCharacterizationVelocityThreshRadPerSec");
+  private static final LoggedTunableNumber manualModeEnabled =
+      new LoggedTunableNumber("Manual/Enabled", 0.0);
+  private static final LoggedTunableNumber manualIndexerRPM =
+      new LoggedTunableNumber("Manual/IndexerRPM", 0.0);
+
+  static {
+    switch (Constants.getCurrentMode()) {
+      case REAL -> {
+        kP.initDefault(50);
+        kI.initDefault(0.0);
+        kD.initDefault(0.0);
+        kS.initDefault(2.85);
+        kV.initDefault(5.0);
+        maxVelocityRadPerSec.initDefault(200.0);
+        maxAccelerationRadPerSec2.initDefault(400.0);
+        staticCharacterizationVelocityThresh.initDefault(0.1);
+      }
+      case SIM, REPLAY -> {
+        kP.initDefault(6.0);
+        kI.initDefault(0.0);
+        kD.initDefault(0.0);
+        kS.initDefault(0.0);
+        kV.initDefault(0.0);
+        maxVelocityRadPerSec.initDefault(300.0);
+        maxAccelerationRadPerSec2.initDefault(600.0);
+        staticCharacterizationVelocityThresh.initDefault(0.1);
+      }
+    }
+  }
 
   private final IndexerIO io;
   private final IndexerIOInputsAutoLogged inputs = new IndexerIOInputsAutoLogged();
@@ -34,6 +72,8 @@ public class Indexer {
 
   @Getter private double targetVelocityRadPerSec = 0.0;
   private boolean closedLoop = false;
+  private boolean staticCharacterizationActive = false;
+  private boolean wasManualMode = false;
 
   @Getter private boolean atSetpoint = false;
 
@@ -49,6 +89,15 @@ public class Indexer {
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Superstructure/Indexer", inputs);
+
+    boolean manualMode = manualModeEnabled.get() > 0.5;
+    if (manualMode && !staticCharacterizationActive) {
+      runVelocityRPM(manualIndexerRPM.get());
+    } else if (wasManualMode && !staticCharacterizationActive) {
+      // Reset to zero once when exiting manual mode.
+      stop();
+    }
+    wasManualMode = manualMode;
 
     // Update gains/config when tunables change
     LoggedTunableNumber.ifChanged(
@@ -91,6 +140,10 @@ public class Indexer {
         Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
     Logger.recordOutput("Superstructure/Indexer/AtSetpoint", atSetpoint);
     Logger.recordOutput("Superstructure/Indexer/ClosedLoop", closedLoop);
+    Logger.recordOutput(
+        "Superstructure/Indexer/StaticCharacterizationActive", staticCharacterizationActive);
+    Logger.recordOutput("Superstructure/Indexer/ManualMode", manualMode);
+    Logger.recordOutput("Superstructure/Indexer/Manual/TargetRPM", manualIndexerRPM.get());
   }
 
   /** Runs closed-loop velocity (rad/s). */
@@ -125,6 +178,48 @@ public class Indexer {
   /** Decelerates to zero using the trapezoidal velocity profile. */
   public void stop() {
     runVelocity(0.0);
+  }
+
+  /** State class for static characterization. */
+  private static class StaticCharacterizationState {
+    public double characterizationCurrentAmps = 0.0;
+  }
+
+  /**
+   * Creates a command for static characterization that ramps current until motion is detected.
+   *
+   * @param currentRampRateAmpsPerSec Rate at which to increase current (amps per second)
+   * @return Command that runs the characterization
+   */
+  public Command staticCharacterization(double currentRampRateAmpsPerSec) {
+    final StaticCharacterizationState state = new StaticCharacterizationState();
+    Timer timer = new Timer();
+    return Commands.startRun(
+            () -> {
+              staticCharacterizationActive = true;
+              closedLoop = false;
+              timer.restart();
+            },
+            () -> {
+              // Keep closed-loop off while characterizing.
+              closedLoop = false;
+              state.characterizationCurrentAmps = currentRampRateAmpsPerSec * timer.get();
+              runOpenLoop(state.characterizationCurrentAmps);
+              Logger.recordOutput(
+                  "Superstructure/Indexer/StaticCharacterizationCurrentAmps",
+                  state.characterizationCurrentAmps);
+            })
+        .until(
+            () -> Math.abs(inputs.velocityRadPerSec) >= staticCharacterizationVelocityThresh.get())
+        .finallyDo(
+            () -> {
+              staticCharacterizationActive = false;
+              timer.stop();
+              io.stop();
+              Logger.recordOutput(
+                  "Superstructure/Indexer/CharacterizationResultCurrentAmps",
+                  state.characterizationCurrentAmps);
+            });
   }
 
   public double getVelocityRadPerSec() {

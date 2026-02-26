@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /** IO implementation for real Limelight hardware. */
-public class VisionIOLimelight implements VisionIO {
+public class TagIOLimelight implements TagIO {
   private final Supplier<Rotation2d> rotationSupplier;
   private final DoubleArrayPublisher orientationPublisher;
 
@@ -34,12 +34,12 @@ public class VisionIOLimelight implements VisionIO {
   private final DoubleArraySubscriber megatag2Subscriber;
 
   /**
-   * Creates a new VisionIOLimelight.
+   * Creates a new TagIOLimelight.
    *
    * @param name The configured name of the Limelight.
    * @param rotationSupplier Supplier for the current estimated rotation, used for MegaTag 2.
    */
-  public VisionIOLimelight(String name, Supplier<Rotation2d> rotationSupplier) {
+  public TagIOLimelight(String name, Supplier<Rotation2d> rotationSupplier) {
     var table = NetworkTableInstance.getDefault().getTable(name);
     this.rotationSupplier = rotationSupplier;
     orientationPublisher = table.getDoubleArrayTopic("robot_orientation_set").publish();
@@ -52,7 +52,7 @@ public class VisionIOLimelight implements VisionIO {
   }
 
   @Override
-  public void updateInputs(VisionIOInputs inputs) {
+  public void updateInputs(TagIOInputs inputs) {
     // Update connection status based on whether an update has been seen in the last
     // 250ms
     inputs.connected =

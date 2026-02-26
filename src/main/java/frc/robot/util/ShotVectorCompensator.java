@@ -80,6 +80,18 @@ public final class ShotVectorCompensator {
     return buildShot(shooterRelativeVelocity, requiredFieldVelocity, shooterFieldVelocity);
   }
 
+  /**
+   * Computes the shooter command for a known field-relative shooter exit velocity.
+   *
+   * <p>This is useful when a caller predicts shooter velocity at release time (for example, by
+   * applying acceleration over time-of-flight).
+   */
+  public static CompensatedShot compensateWithShooterFieldVelocity(
+      Translation3d requiredFieldVelocity, Translation3d shooterFieldVelocity) {
+    Translation3d shooterRelativeVelocity = requiredFieldVelocity.minus(shooterFieldVelocity);
+    return buildShot(shooterRelativeVelocity, requiredFieldVelocity, shooterFieldVelocity);
+  }
+
   /** Converts robot-relative chassis linear velocity to field-relative translation velocity. */
   public static Translation2d robotRelativeToField(
       ChassisSpeeds robotRelativeSpeeds, Rotation2d robotHeading) {

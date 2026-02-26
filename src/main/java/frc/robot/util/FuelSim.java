@@ -43,7 +43,7 @@ public class FuelSim {
       0.1; // proportion of horizontal velocity to lose per second while on ground
   private static final double FUEL_MASS = 0.227; // kg (matches trajectory solver)
   private static final double FUEL_CROSS_AREA = Math.PI * FUEL_RADIUS * FUEL_RADIUS;
-  private static final int MAX_FUEL_COUNT = 200;
+  private static final int MAX_FUEL_COUNT = 500;
   // Drag coefficient of smooth sphere:
   // https://en.wikipedia.org/wiki/Drag_coefficient#/media/File:14ilf1l.svg
   private static final double DRAG_COF = 0.47; // dimensionless
@@ -260,6 +260,9 @@ public class FuelSim {
     }
   }
 
+  /** Immutable view of a single simulated fuel state. */
+  public static record FuelState(Translation3d position, Translation3d velocity) {}
+
   private static void handleFuelCollision(Fuel a, Fuel b) {
     Translation3d normal = a.pos.minus(b.pos);
     double distance = normal.getNorm();
@@ -349,6 +352,26 @@ public class FuelSim {
 
   /** Spawns fuel in the depots */
   public void spawnStartingFuel() {
+    // Center fuel
+    Translation3d center = new Translation3d(FIELD_LENGTH / 2, FIELD_WIDTH / 2, FUEL_RADIUS);
+    for (int i = 0; i < 15; i++) {
+      for (int j = 0; j < 6; j++) {
+        fuels.add(
+            new Fuel(
+                center.plus(new Translation3d(0.076 + 0.152 * j, 0.0254 + 0.076 + 0.152 * i, 0))));
+        fuels.add(
+            new Fuel(
+                center.plus(new Translation3d(-0.076 - 0.152 * j, 0.0254 + 0.076 + 0.152 * i, 0))));
+        fuels.add(
+            new Fuel(
+                center.plus(new Translation3d(0.076 + 0.152 * j, -0.0254 - 0.076 - 0.152 * i, 0))));
+        fuels.add(
+            new Fuel(
+                center.plus(
+                    new Translation3d(-0.076 - 0.152 * j, -0.0254 - 0.076 - 0.152 * i, 0))));
+      }
+    }
+
     // Depots
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 4; j++) {
@@ -385,6 +408,18 @@ public class FuelSim {
     Logger.recordOutput(
         "Fuel Simulation/Fuels",
         fuels.stream().map((fuel) -> fuel.pos).toArray(Translation3d[]::new));
+  }
+
+  /** Returns immutable snapshots of all fuel states for downstream simulation systems. */
+  public FuelState[] getFuelStates() {
+    return fuels.stream()
+        .map((fuel) -> new FuelState(fuel.pos, fuel.vel))
+        .toArray(FuelState[]::new);
+  }
+
+  /** Returns fuel radius in meters. */
+  public static double getFuelRadiusMeters() {
+    return FUEL_RADIUS;
   }
 
   /** Start the simulation. `updateSim` must still be called every loop */

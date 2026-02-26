@@ -11,7 +11,7 @@ import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 public class TurretIOSim implements TurretIO {
-  private static final double moi = 0.5;
+  private static final double moi = 0.001;
 
   // Turret hard stop limits (degrees)
   private static final double MAX_ANGLE_DEG = 185.0;
@@ -95,6 +95,12 @@ public class TurretIOSim implements TurretIO {
   public void runVolts(double volts) {
     closedLoop = false;
     setInputVoltage(volts);
+  }
+
+  @Override
+  public void runCurrent(double currentAmps) {
+    closedLoop = false;
+    setInputTorqueCurrent(currentAmps);
   }
 
   @Override

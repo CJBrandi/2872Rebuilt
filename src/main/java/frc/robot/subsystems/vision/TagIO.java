@@ -11,9 +11,9 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import org.littletonrobotics.junction.AutoLog;
 
-public interface VisionIO {
+public interface TagIO {
   @AutoLog
-  public static class VisionIOInputs {
+  public static class TagIOInputs {
     public boolean connected = false;
     public TargetObservation latestTargetObservation =
         new TargetObservation(Rotation2d.kZero, Rotation2d.kZero);
@@ -39,5 +39,5 @@ public interface VisionIO {
     PHOTONVISION
   }
 
-  public default void updateInputs(VisionIOInputs inputs) {}
+  public default void updateInputs(TagIOInputs inputs) {}
 }

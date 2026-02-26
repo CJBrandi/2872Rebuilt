@@ -10,6 +10,7 @@ package frc.robot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.util.FuelSim;
+import frc.robot.util.HubShiftUtil;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -26,6 +27,15 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 public class Robot extends LoggedRobot {
   private Command autonomousCommand;
   private RobotContainer robotContainer;
+  private boolean homingScheduledThisBoot = false;
+
+  private void scheduleHomingOncePerBoot() {
+    if (homingScheduledThisBoot) {
+      return;
+    }
+    CommandScheduler.getInstance().schedule(robotContainer.getHomingCommand());
+    homingScheduledThisBoot = true;
+  }
 
   public Robot() {
     // Record metadata
@@ -104,7 +114,7 @@ public class Robot extends LoggedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
-    CommandScheduler.getInstance().schedule(robotContainer.getHomingCommand());
+    scheduleHomingOncePerBoot();
 
     autonomousCommand = robotContainer.getAutonomousCommand();
 
@@ -120,7 +130,8 @@ public class Robot extends LoggedRobot {
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
-    CommandScheduler.getInstance().schedule(robotContainer.getHomingCommand());
+    HubShiftUtil.initialize();
+    scheduleHomingOncePerBoot();
 
     if (autonomousCommand != null) {
       autonomousCommand.cancel();

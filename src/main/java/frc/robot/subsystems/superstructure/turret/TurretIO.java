@@ -23,6 +23,8 @@ public interface TurretIO {
 
   default void runVolts(double volts) {}
 
+  default void runCurrent(double currentAmps) {}
+
   default void stop() {}
 
   default void runPosition(Rotation2d position, double feedforward) {}

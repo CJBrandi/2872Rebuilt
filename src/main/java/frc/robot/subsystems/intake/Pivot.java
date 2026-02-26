@@ -8,7 +8,6 @@
 package frc.robot.subsystems.intake;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
@@ -18,6 +17,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.Mode;
 import frc.robot.util.EqualsUtil;
@@ -30,7 +30,7 @@ import lombok.Setter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-public class Pivot {
+public class Pivot extends SubsystemBase {
   // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Intake/Pivot/kP");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Intake/Pivot/kD");
@@ -44,14 +44,6 @@ public class Pivot {
       new LoggedTunableNumber("Intake/Pivot/staticVelocityThresh", 0.1);
   private static final LoggedTunableNumber tolerance =
       new LoggedTunableNumber("Intake/Pivot/Tolerance", 45);
-
-  // Homing parameters
-  private static final LoggedTunableNumber homingVolts =
-      new LoggedTunableNumber("Intake/Pivot/HomingVolts", 2.0);
-  private static final LoggedTunableNumber homingTimeSecs =
-      new LoggedTunableNumber("Intake/Pivot/HomingTimeSecs", 0.25);
-  private static final LoggedTunableNumber homingVelocityThresh =
-      new LoggedTunableNumber("Intake/Pivot/HomingVelocityThresh", 0.1);
 
   static {
     switch (Constants.getCurrentMode()) {
@@ -89,6 +81,7 @@ public class Pivot {
   private TrapezoidProfile profile;
   @Getter private State setpoint = new State();
   private DoubleSupplier goal = () -> Intake.stowedAngle.getRadians();
+  private boolean profileInitialized = false;
   private boolean stopProfile = false;
   @Getter private boolean shouldEStop = false;
   @Setter private boolean isEStopped = false;
@@ -97,13 +90,8 @@ public class Pivot {
   @AutoLogOutput(key = "Intake/Pivot/AtGoal")
   private boolean atGoal = false;
 
-  // Homing state
-  @AutoLogOutput(key = "Intake/Pivot/HomedPositionRad")
-  private double homedPosition = 0.0;
-
-  @AutoLogOutput @Getter private boolean homed = false;
-
-  private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
+  // Homed state is explicit and can be controlled directly.
+  @AutoLogOutput @Getter @Setter private boolean homed = false;
 
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
@@ -119,8 +107,14 @@ public class Pivot {
             new TrapezoidProfile.Constraints(
                 Units.degreesToRadians(maxVelocityDegPerSec.get()),
                 Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
+
+    // Sim/replay default to homed.
+    if (Constants.getCurrentMode() != Mode.REAL) {
+      homed = true;
+    }
   }
 
+  @Override
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Intake/Pivot", inputs);
@@ -147,6 +141,10 @@ public class Pivot {
 
     // Get current angle
     angle = inputs.internalPosition;
+    if (!profileInitialized) {
+      setpoint = new State(angle.getRadians(), 0.0);
+      profileInitialized = true;
+    }
 
     // Run profile
     final boolean shouldRunProfile =
@@ -181,25 +179,41 @@ public class Pivot {
       // Check at goal
       atGoal =
           EqualsUtil.epsilonEquals(setpoint.position, goalState.position)
-              && EqualsUtil.epsilonEquals(setpoint.velocity, 0.0);
+              && EqualsUtil.epsilonEquals(setpoint.velocity, goalState.velocity);
 
       // Log state
-      Logger.recordOutput("Intake/Pivot/SetpointPositionRad", setpoint.position);
-      Logger.recordOutput("Intake/Pivot/SetpointVelocityRadPerSec", setpoint.velocity);
-      Logger.recordOutput("Intake/Pivot/GoalPositionRad", goalState.position);
+      Logger.recordOutput("Intake/Pivot/Profile/SetpointPositionRad", setpoint.position);
+      Logger.recordOutput(
+          "Intake/Pivot/Profile/SetpointPositionDeg", Math.toDegrees(setpoint.position));
+      Logger.recordOutput("Intake/Pivot/Profile/SetpointVelocityRadPerSec", setpoint.velocity);
+      Logger.recordOutput("Intake/Pivot/Profile/GoalPositionRad", goalState.position);
+      Logger.recordOutput(
+          "Intake/Pivot/Profile/GoalPositionDeg", Math.toDegrees(goalState.position));
+      Logger.recordOutput("Intake/Pivot/Profile/GoalVelocityRadPerSec", goalState.velocity);
+      Logger.recordOutput(
+          "Intake/Pivot/Profile/GoalVelocityDegPerSec", Math.toDegrees(goalState.velocity));
     } else {
       // Reset setpoint
       setpoint = new State(angle.getRadians(), 0.0);
 
       // Clear logs
-      Logger.recordOutput("Intake/Pivot/SetpointPositionRad", 0.0);
-      Logger.recordOutput("Intake/Pivot/SetpointVelocityRadPerSec", 0.0);
-      Logger.recordOutput("Intake/Pivot/GoalPositionRad", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/SetpointPositionRad", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/SetpointPositionDeg", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/SetpointVelocityRadPerSec", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/GoalPositionRad", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/GoalPositionDeg", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/GoalVelocityRadPerSec", 0.0);
+      Logger.recordOutput("Intake/Pivot/Profile/GoalVelocityDegPerSec", 0.0);
     }
 
     // Log state
     Logger.recordOutput("Intake/Pivot/CoastOverride", coastOverride.getAsBoolean());
     Logger.recordOutput("Intake/Pivot/DisabledOverride", disabledOverride.getAsBoolean());
+    Logger.recordOutput("Intake/Pivot/MeasuredPositionRad", angle.getRadians());
+    Logger.recordOutput("Intake/Pivot/MeasuredPositionDeg", angle.getDegrees());
+    Logger.recordOutput("Intake/Pivot/MeasuredVelocityRadPerSec", inputs.velocityRadPerSec);
+    Logger.recordOutput(
+        "Intake/Pivot/MeasuredVelocityDegPerSec", Math.toDegrees(inputs.velocityRadPerSec));
   }
 
   public void setGoal(Supplier<Rotation2d> goal) {
@@ -257,33 +271,7 @@ public class Pivot {
    * @return Command that runs the homing sequence
    */
   public Command homingSequence() {
-    return Commands.startRun(
-            () -> {
-              homed = false;
-              homingDebouncer = new Debouncer(homingTimeSecs.get());
-              homingDebouncer.calculate(false);
-            },
-            () -> {
-              io.runVolts(homingVolts.get());
-              homed =
-                  homingDebouncer.calculate(
-                      Math.abs(inputs.velocityRadPerSec) <= homingVelocityThresh.get());
-              Logger.recordOutput("Intake/Pivot/Homing", true);
-              Logger.recordOutput("Intake/Pivot/HomingVelocity", inputs.velocityRadPerSec);
-            })
-        .until(() -> homed)
-        .andThen(
-            () -> {
-              io.stop();
-              homedPosition = inputs.internalPosition.getRadians();
-              io.setPosition(90.0); // Stowed position is 90 degrees
-              homed = true;
-              Logger.recordOutput("Intake/Pivot/HomedPosition", homedPosition);
-            })
-        .finallyDo(
-            () -> {
-              Logger.recordOutput("Intake/Pivot/Homing", false);
-            });
+    return Commands.runOnce(() -> homed = true, this);
   }
 
   public Command staticCharacterization(double outputRampRate) {
@@ -299,7 +287,8 @@ public class Pivot {
               io.runOpenLoop(state.characterizationOutput);
               Logger.recordOutput(
                   "Intake/Pivot/StaticCharacterizationOutput", state.characterizationOutput);
-            })
+            },
+            this)
         .until(() -> inputs.velocityRadPerSec >= staticVelocityThresh.get())
         .finallyDo(
             () -> {

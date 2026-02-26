@@ -5,6 +5,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.system.NumericalIntegration;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 public class FlywheelIOSim implements FlywheelIO {
@@ -56,7 +57,9 @@ public class FlywheelIOSim implements FlywheelIO {
     } else {
       // Run control at 1kHz for more accurate simulation
       double setpoint = controller.getSetpoint();
-      double feedforward = (setpoint > 0 ? kS : 0) + kV * setpoint;
+      // Keep FF units consistent with real Talon velocity loop:
+      // kV is in Amps per rotation/sec, while setpoint here is rad/sec.
+      double feedforward = (setpoint > 0 ? kS : 0) + kV * Units.radiansToRotations(setpoint);
       for (int i = 0; i < (int) (Constants.loopPeriodSecs / (1.0 / 1000.0)); i++) {
         // Use velocity (simState.get(0)) as the measurement for velocity control
         setInputTorqueCurrent(controller.calculate(simState.get(0)) + feedforward);

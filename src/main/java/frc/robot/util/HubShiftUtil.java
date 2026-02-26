@@ -110,4 +110,19 @@ public class HubShiftUtil {
     ShiftInfo shiftInfo = new ShiftInfo(currentShift, stateTimeElapsed, stateTimeRemaining, active);
     return shiftInfo;
   }
+
+  /** Returns true when the current shift is active for the robot's alliance. */
+  public static boolean isOwnAllianceShiftActive() {
+    return getShiftInfo().active();
+  }
+
+  /** Returns the current shift name for debug logging. */
+  public static String getShiftName() {
+    return getShiftInfo().currentShift().name();
+  }
+
+  /** Returns seconds remaining in the current shift window. */
+  public static double getShiftRemainingSec() {
+    return getShiftInfo().remainingTime();
+  }
 }

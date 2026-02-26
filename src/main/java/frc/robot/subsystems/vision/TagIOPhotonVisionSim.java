@@ -17,19 +17,19 @@ import org.photonvision.simulation.SimCameraProperties;
 import org.photonvision.simulation.VisionSystemSim;
 
 /** IO implementation for physics sim using PhotonVision simulator. */
-public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
+public class TagIOPhotonVisionSim extends TagIOPhotonVision {
   private static VisionSystemSim visionSim;
 
   private final Supplier<Pose2d> poseSupplier;
   private final PhotonCameraSim cameraSim;
 
   /**
-   * Creates a new VisionIOPhotonVisionSim.
+   * Creates a new TagIOPhotonVisionSim.
    *
    * @param name The name of the camera.
    * @param poseSupplier Supplier for the robot pose to use in simulation.
    */
-  public VisionIOPhotonVisionSim(
+  public TagIOPhotonVisionSim(
       String name, Transform3d robotToCamera, Supplier<Pose2d> poseSupplier) {
     super(name, robotToCamera);
     this.poseSupplier = poseSupplier;
@@ -47,7 +47,7 @@ public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
   }
 
   @Override
-  public void updateInputs(VisionIOInputs inputs) {
+  public void updateInputs(TagIOInputs inputs) {
     visionSim.update(poseSupplier.get());
     super.updateInputs(inputs);
   }

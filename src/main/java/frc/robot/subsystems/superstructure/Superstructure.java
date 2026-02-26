@@ -18,6 +18,7 @@ public class Superstructure extends SubsystemBase {
   private final Turret turret;
   private final Indexer indexer;
   private final ShotCalculator shotCalculator;
+  private int fuelSimInventoryCount = 0;
 
   public Superstructure(Shooter shooter, Turret turret, Indexer indexer) {
     this.shooter = shooter;
@@ -41,6 +42,7 @@ public class Superstructure extends SubsystemBase {
     indexer.periodic();
 
     Logger.recordOutput("Superstructure/ReadyToShoot", isReadyToShoot());
+    Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);
   }
 
   @AutoLogOutput(key = "Superstructure/ReadyToShoot")
@@ -72,9 +74,20 @@ public class Superstructure extends SubsystemBase {
     return indexer;
   }
 
+  /** Increments simulated shooter inventory when a fuel enters the intake box. */
+  public void addFuelSimIntaked() {
+    if (Constants.currentMode != Constants.Mode.SIM) {
+      return;
+    }
+    fuelSimInventoryCount++;
+  }
+
   /** Launches a fuel in simulation. Call this when shooting a ball. Only has effect in SIM mode. */
   public void launchFuelSim() {
     if (Constants.currentMode != Constants.Mode.SIM) {
+      return;
+    }
+    if (fuelSimInventoryCount <= 0) {
       return;
     }
 
@@ -88,5 +101,6 @@ public class Superstructure extends SubsystemBase {
             Radians.of(params.pitchAngle()), // Raw lookup table pitch (from horizontal)
             Radians.of(turret.getFieldRelativeAngle().getRadians()),
             Meters.of(Constants.launchHeight));
+    fuelSimInventoryCount--;
   }
 }

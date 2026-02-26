@@ -6,6 +6,7 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -26,17 +27,19 @@ public class TurretIOTalonFX implements TurretIO {
   private static final double GEAR_RATIO =
       Constants.SuperstructureConstants.TurretConstants.reduction;
 
-  // Turret limits in mechanism rotations
-  private static final double MIN_ANGLE_ROTATIONS = 0.0;
-  private static final double MAX_ANGLE_ROTATIONS = Units.radiansToRotations((3 * Math.PI) / 2);
-
   private final TalonFX talon;
-  DigitalInput leftHall = new DigitalInput(0);
-  DigitalInput middleHall = new DigitalInput(1);
-  DigitalInput rightHall = new DigitalInput(2);
+  DigitalInput leftHall = new DigitalInput(2);
+  DigitalInput middleHall = new DigitalInput(0);
+  DigitalInput rightHall = new DigitalInput(1);
+
+  // Hall sensors are wired active-low: false means magnet present.
+  private static boolean isHallTriggered(DigitalInput input) {
+    return !input.get();
+  }
 
   // Control requests
   private final VoltageOut voltageRequest = new VoltageOut(0.0);
+  private final TorqueCurrentFOC currentRequest = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final PositionVoltage positionRequest = new PositionVoltage(0.0);
 
   // Status signals
@@ -64,6 +67,8 @@ public class TurretIOTalonFX implements TurretIO {
     config.CurrentLimits.StatorCurrentLimitEnable = true;
     config.CurrentLimits.SupplyCurrentLimit = 30.0;
     config.CurrentLimits.SupplyCurrentLimitEnable = true;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 40.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
 
     // PID gains (slot 0)
     config.Slot0.kP = 0.0;
@@ -87,8 +92,10 @@ public class TurretIOTalonFX implements TurretIO {
 
     // Set update frequency
     BaseStatusSignal.setUpdateFrequencyForAll(
-        100.0, position, velocity, appliedVolts, current, temperature);
+        250.0, position, velocity, appliedVolts, current, temperature);
     talon.optimizeBusUtilization();
+
+    talon.setPosition(0);
   }
 
   @Override
@@ -96,9 +103,9 @@ public class TurretIOTalonFX implements TurretIO {
     var status =
         BaseStatusSignal.refreshAll(position, velocity, appliedVolts, current, temperature);
 
-    inputs.hallEffectState[0] = leftHall.get();
-    inputs.hallEffectState[1] = middleHall.get();
-    inputs.hallEffectState[2] = rightHall.get();
+    inputs.hallEffectState[0] = isHallTriggered(leftHall);
+    inputs.hallEffectState[1] = isHallTriggered(middleHall);
+    inputs.hallEffectState[2] = isHallTriggered(rightHall);
 
     inputs.motorConnected = connectedDebouncer.calculate(status.isOK());
     inputs.encoderConnected = inputs.motorConnected;
@@ -117,6 +124,11 @@ public class TurretIOTalonFX implements TurretIO {
   @Override
   public void runVolts(double volts) {
     talon.setControl(voltageRequest.withOutput(volts));
+  }
+
+  @Override
+  public void runCurrent(double currentAmps) {
+    talon.setControl(currentRequest.withOutput(currentAmps));
   }
 
   @Override

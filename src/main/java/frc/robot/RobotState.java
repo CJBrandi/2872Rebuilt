@@ -2,6 +2,7 @@ package frc.robot;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import frc.robot.util.FieldConstants;
@@ -18,6 +19,8 @@ public class RobotState {
 
   @Getter @Setter private Pose2d robotPose = new Pose2d();
   @Getter @Setter private ChassisSpeeds robotVelocity = new ChassisSpeeds();
+  @Getter private Translation2d bestFuelCluster = new Translation2d();
+  @Getter private boolean hasBestFuelCluster = false;
 
   // Turret angle buffer for vision pose estimation
   private final NavigableMap<Double, Rotation2d> turretAngleBuffer = new TreeMap<>();
@@ -53,10 +56,22 @@ public class RobotState {
     return floor.getValue().interpolate(ceiling.getValue(), t);
   }
 
+  public void setBestFuelCluster(Translation2d cluster) {
+    bestFuelCluster = cluster;
+    hasBestFuelCluster = true;
+  }
+
+  public void clearBestFuelCluster() {
+    bestFuelCluster = new Translation2d();
+    hasBestFuelCluster = false;
+  }
+
   public void periodic() {
     // Calculate horizontal distance from robot to HUB
     Translation3d hubCenter = FieldConstants.Hub.topCenterPoint.get();
     double horizontalDistance = robotPose.getTranslation().getDistance(hubCenter.toTranslation2d());
     Logger.recordOutput("RobotState/HubDistanceMeters", horizontalDistance);
+    Logger.recordOutput("RobotState/FuelPickup/HasBestCluster", hasBestFuelCluster);
+    Logger.recordOutput("RobotState/FuelPickup/BestCluster", bestFuelCluster);
   }
 }

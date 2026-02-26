@@ -22,31 +22,35 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
+import frc.robot.commands.FullAutoFuelPickupCommand;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.*;
 import frc.robot.subsystems.elevator.Elevator;
 import frc.robot.subsystems.elevator.ElevatorIO;
-import frc.robot.subsystems.elevator.ElevatorIOKraken;
 import frc.robot.subsystems.elevator.ElevatorIOSim;
 import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.Pivot;
 import frc.robot.subsystems.intake.PivotIO;
 import frc.robot.subsystems.intake.PivotIOSim;
-import frc.robot.subsystems.intake.PivotIOTalonFX;
+import frc.robot.subsystems.intake.Roller;
 import frc.robot.subsystems.intake.RollerIO;
 import frc.robot.subsystems.intake.RollerIOSim;
-import frc.robot.subsystems.intake.RollerIOTalonFX;
 import frc.robot.subsystems.superstructure.Superstructure;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
+import frc.robot.subsystems.superstructure.indexer.IndexerIO;
 import frc.robot.subsystems.superstructure.indexer.IndexerIOSim;
+import frc.robot.subsystems.superstructure.indexer.IndexerIOTalonFX;
 import frc.robot.subsystems.superstructure.shooter.*;
 import frc.robot.subsystems.superstructure.turret.Turret;
 import frc.robot.subsystems.superstructure.turret.TurretIO;
 import frc.robot.subsystems.superstructure.turret.TurretIOSim;
 import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
-import frc.robot.subsystems.vision.Vision;
-import frc.robot.subsystems.vision.VisionIO;
-import frc.robot.subsystems.vision.VisionIOPhotonVision;
-import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import frc.robot.subsystems.vision.Detection;
+import frc.robot.subsystems.vision.DetectionIO;
+import frc.robot.subsystems.vision.DetectionIOSim;
+import frc.robot.subsystems.vision.Tag;
+import frc.robot.subsystems.vision.TagIO;
+import frc.robot.subsystems.vision.TagIOPhotonVisionSim;
 import frc.robot.util.FuelSim;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
@@ -61,8 +65,10 @@ public class RobotContainer {
   private final Drive drive;
   private final Superstructure superstructure;
   private final Elevator elevator;
-  private final Intake intake;
-  private Vision vision;
+  private final Pivot pivot;
+  private final Roller roller;
+  private Tag tag;
+  private Detection detection;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
@@ -78,6 +84,7 @@ public class RobotContainer {
   public RobotContainer() {
     switch (Constants.currentMode) {
       case REAL:
+        /*
         drive =
             new Drive(
                 new GyroIOPigeon2(),
@@ -92,6 +99,8 @@ public class RobotContainer {
                     new FlywheelIOTalonFX(
                         Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
                         Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
+                            .followerCanId,
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
                             .canBus),
                     new HoodIOTalonFX(
                         Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
@@ -100,7 +109,10 @@ public class RobotContainer {
                     new TurretIOTalonFX(
                         Constants.SuperstructureConstants.TurretConstants.canId,
                         Constants.SuperstructureConstants.TurretConstants.canBus)),
-                new Indexer(new IndexerIOSim()));
+                new Indexer(
+                    new IndexerIOTalonFX(
+                        Constants.SuperstructureConstants.IndexerConstants.canId,
+                        Constants.SuperstructureConstants.IndexerConstants.canBus)));
 
         elevator =
             new Elevator(
@@ -109,19 +121,66 @@ public class RobotContainer {
                     Constants.ElevatorConstants.followerCanId,
                     Constants.ElevatorConstants.canBus));
 
-        intake =
-            new Intake(
+        pivot =
+            new Pivot(
                 new PivotIOTalonFX(
                     Constants.IntakeConstants.PivotConstants.canId,
-                    Constants.IntakeConstants.canBus),
+                    Constants.IntakeConstants.canBus));
+        roller =
+            new Roller(
                 new RollerIOTalonFX(
                     Constants.IntakeConstants.RollerConstants.canId,
                     Constants.IntakeConstants.RollerConstants.canRangeId,
                     Constants.IntakeConstants.canBus));
 
-        vision =
-            new Vision(
-                drive::addVisionMeasurement, new VisionIOPhotonVision(camera0Name, robotToCamera0));
+        tag =
+            new Tag(
+                drive::addVisionMeasurement, new TagIOPhotonVision(camera0Name, robotToCamera0));
+
+        detection = new Detection(drive::getPose, new DetectionIOLimeLight("limelight", "fuel"));
+
+         */
+
+        drive =
+            new Drive(
+                new GyroIOPigeon2(),
+                new ModuleIOTalonFX(TunerConstants.FrontLeft),
+                new ModuleIOTalonFX(TunerConstants.FrontRight),
+                new ModuleIOTalonFX(TunerConstants.BackLeft),
+                new ModuleIOTalonFX(TunerConstants.BackRight));
+
+        superstructure =
+            new Superstructure(
+                new Shooter(
+                    new FlywheelIOTalonFX(
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
+                            .followerCanId,
+                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
+                            .canBus),
+                    new HoodIOTalonFX(
+                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
+                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus)),
+                new Turret(
+                    new TurretIOTalonFX(
+                        Constants.SuperstructureConstants.TurretConstants.canId,
+                        Constants.SuperstructureConstants.TurretConstants.canBus)),
+                new Indexer(
+                    new IndexerIOTalonFX(
+                        Constants.SuperstructureConstants.IndexerConstants.canId,
+                        Constants.SuperstructureConstants.IndexerConstants.canBus)));
+
+        elevator = new Elevator(new ElevatorIOSim());
+
+        pivot = new Pivot(new PivotIOSim());
+        roller = new Roller(new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
+
+        tag =
+            new Tag(
+                drive::addVisionMeasurement,
+                new TagIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
+                new TagIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
+        detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
 
         break;
 
@@ -143,13 +202,15 @@ public class RobotContainer {
 
         elevator = new Elevator(new ElevatorIOSim());
 
-        intake = new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
+        pivot = new Pivot(new PivotIOSim());
+        roller = new Roller(new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
 
-        vision =
-            new Vision(
+        tag =
+            new Tag(
                 drive::addVisionMeasurement,
-                new VisionIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
-                new VisionIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
+                new TagIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
+                new TagIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
+        detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
         break;
 
       default:
@@ -166,13 +227,15 @@ public class RobotContainer {
             new Superstructure(
                 new Shooter(new FlywheelIO() {}, new HoodIO() {}),
                 new Turret(new TurretIO() {}),
-                new Indexer(new IndexerIOSim()));
+                new Indexer(new IndexerIO() {}));
 
         elevator = new Elevator(new ElevatorIO() {});
 
-        intake = new Intake(new PivotIO() {}, new RollerIO() {});
+        pivot = new Pivot(new PivotIO() {});
+        roller = new Roller(new RollerIO() {});
 
-        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
+        tag = new Tag(drive::addVisionMeasurement, new TagIO() {}, new TagIO() {});
+        detection = new Detection(drive::getPose, new DetectionIO() {});
         break;
     }
 
@@ -196,13 +259,28 @@ public class RobotContainer {
                 robotHeading);
           });
 
-      // Register intake bounding box
+      // Register intake bounding box.
+      // Camera measurement is the left corner of the intake in robot frame (+X forward, +Y left).
+      // Intake spans full robot width from that left edge and extends rearward by a fixed depth.
+      final double intakeLeftY = robotToDetectionCamera.getY();
+      final double intakeRightY = intakeLeftY - Constants.RobotDimensions.width;
+      final double intakeCameraEdgeX = robotToDetectionCamera.getX();
+      final double robotRearEdgeX = -Constants.RobotDimensions.length / 2.0;
+      final double intakeXMin = Math.min(intakeCameraEdgeX, robotRearEdgeX);
+      final double intakeXMax = Math.max(intakeCameraEdgeX, robotRearEdgeX);
+      final double intakeYMin = Math.min(intakeRightY, intakeLeftY);
+      final double intakeYMax = Math.max(intakeRightY, intakeLeftY);
+
       fuelSim.registerIntake(
-          Constants.IntakeBounds.xMin,
-          Constants.IntakeBounds.xMax,
-          Constants.IntakeBounds.yMin,
-          Constants.IntakeBounds.yMax,
-          () -> true); // TODO: wire to actual intake running state
+          intakeXMin,
+          intakeXMax,
+          intakeYMin,
+          intakeYMax,
+          () ->
+              pivot.getAngle().getDegrees() <= Constants.IntakeBounds.maxDeployAngleDeg
+                  && roller.getVelocityRadsPerSec()
+                      > Constants.IntakeBounds.intakeActiveVelocityRadPerSec,
+          superstructure::addFuelSimIntaked);
 
       // Enable air resistance for more realistic physics
       fuelSim.enableAirResistance();
@@ -241,6 +319,8 @@ public class RobotContainer {
 
     autoChooser.addOption(
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
+    autoChooser.addOption(
+        "Indexer Static Characterization", superstructure.getIndexer().staticCharacterization(2.0));
 
     // Hood characterization/homing routines
     autoChooser.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
@@ -253,7 +333,7 @@ public class RobotContainer {
 
     // Intake characterization
     autoChooser.addOption(
-        "Intake Pivot Static Characterization", intake.staticCharacterization(2.0));
+        "Intake Pivot Static Characterization", pivot.staticCharacterization(2.0));
 
     // Configure the button bindings
     configureButtonBindings();
@@ -271,7 +351,7 @@ public class RobotContainer {
             drive,
             () -> -controller.getLeftY(),
             () -> -controller.getLeftX(),
-            () -> -controller.getRightX()));
+            this::getDriverOmegaInput));
 
     controller
         .x()
@@ -295,7 +375,7 @@ public class RobotContainer {
             superstructure));
 
     controller
-        .b()
+        .a()
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -310,8 +390,30 @@ public class RobotContainer {
     controller.pov(180).onTrue(elevator.setTarget(Elevator.Target.DOWN));
 
     // Intake control
-    controller.leftBumper().whileTrue(intake.intakeCommand());
-    controller.rightBumper().whileTrue(intake.ejectCommand());
+    controller.y().whileTrue(new FullAutoFuelPickupCommand(drive, pivot, roller));
+
+    controller
+        .b()
+        .whileTrue(
+            Commands.runEnd(
+                () -> {
+                  pivot.setGoal(() -> Intake.groundAngle);
+                  roller.runIntake();
+                },
+                () -> {
+                  pivot.setGoal(() -> Intake.stowedAngle);
+                  roller.stop();
+                },
+                pivot,
+                roller));
+    controller.rightBumper().whileTrue(Commands.runEnd(roller::runEject, roller::stop, roller));
+  }
+
+  private double getDriverOmegaInput() {
+    if (Constants.currentMode == Constants.Mode.SIM) {
+      return -controller.getHID().getRawAxis(Constants.DriverController.simOmegaAxis);
+    }
+    return -controller.getRightX();
   }
 
   /**
@@ -328,6 +430,6 @@ public class RobotContainer {
         superstructure.getShooter().hoodHomingCommand(),
         superstructure.getTurret().homingSequence(),
         elevator.homingSequence(),
-        intake.homingSequence());
+        pivot.homingSequence());
   }
 }

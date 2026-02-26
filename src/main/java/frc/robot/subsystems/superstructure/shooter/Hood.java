@@ -25,26 +25,51 @@ public class Hood {
   private static final double MAX_ANGLE_RAD = MIN_ANGLE_RAD + Math.toRadians(34.5);
 
   // PID gains (output in Amps for TorqueCurrentFOC)
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Hood/kP", 2000);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/Hood/kD", 0.0);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Hood/kP");
+  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/Hood/kD");
   // Feedforward gains (Amps)
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Hood/kS", -2.0);
-  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Shooter/Hood/kG", 3.0);
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Hood/kS");
+  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Shooter/Hood/kG");
 
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Shooter/Hood/MaxVelocityDegPerSec", 90);
+      new LoggedTunableNumber("Shooter/Hood/MaxVelocityDegPerSec");
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Shooter/Hood/MaxAccelerationDegPerSec2", 180);
+      new LoggedTunableNumber("Shooter/Hood/MaxAccelerationDegPerSec2");
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
-      new LoggedTunableNumber("Shooter/Hood/StaticCharacterizationVelocityThreshRadPerSec", 0.1);
+      new LoggedTunableNumber("Shooter/Hood/StaticCharacterizationVelocityThreshRadPerSec");
 
   // Homing parameters
   private static final LoggedTunableNumber homingVolts =
-      new LoggedTunableNumber("Shooter/Hood/HomingVolts", -1.25);
+      new LoggedTunableNumber("Shooter/Hood/HomingVolts");
   private static final LoggedTunableNumber homingVelocityThresh =
-      new LoggedTunableNumber("Shooter/Hood/HomingVelocityThreshRadPerSec", 0.3);
+      new LoggedTunableNumber("Shooter/Hood/HomingVelocityThreshRadPerSec");
   private static final LoggedTunableNumber homingTimeSecs =
-      new LoggedTunableNumber("Shooter/Hood/HomingTimeSecs", 0.1);
+      new LoggedTunableNumber("Shooter/Hood/HomingTimeSecs");
+
+  static {
+    switch (Constants.getCurrentMode()) {
+      case REAL -> {
+        kP.initDefault(1500);
+        kD.initDefault(0.0);
+        kS.initDefault(5);
+        kG.initDefault(0);
+        maxVelocityDegPerSec.initDefault(180);
+        maxAccelerationDegPerSec2.initDefault(360);
+      }
+      case SIM, REPLAY -> {
+        kP.initDefault(300);
+        kD.initDefault(10.0);
+        kS.initDefault(0.0);
+        kG.initDefault(0.0);
+        maxVelocityDegPerSec.initDefault(120);
+        maxAccelerationDegPerSec2.initDefault(240);
+      }
+    }
+    staticCharacterizationVelocityThresh.initDefault(0.1);
+    homingVolts.initDefault(-1.25);
+    homingVelocityThresh.initDefault(0.3);
+    homingTimeSecs.initDefault(0.1);
+  }
 
   private final HoodIO io;
   private final HoodIOInputsAutoLogged inputs = new HoodIOInputsAutoLogged();

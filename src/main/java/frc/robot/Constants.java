@@ -18,7 +18,7 @@ import lombok.Getter;
  */
 public final class Constants {
   public static final double loopPeriodSecs = 0.02;
-  public static final Mode simMode = Mode.SIM;
+  public static final Mode simMode = Mode.REAL;
   @Getter public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : simMode;
   public static final boolean tuningMode = true;
   public static boolean disableHAL = false;
@@ -35,10 +35,9 @@ public final class Constants {
 
   // Intake bounding box for FuelSim (robot-relative, meters)
   public static class IntakeBounds {
-    public static final double xMin = 0.25; // Front of robot
-    public static final double xMax = 0.40;
-    public static final double yMin = -0.20;
-    public static final double yMax = 0.20;
+    public static final double depthMeters = 0.15;
+    public static final double maxDeployAngleDeg = 25.0;
+    public static final double intakeActiveVelocityRadPerSec = 20.0;
   }
 
   // Shooter launch height for FuelSim (meters)
@@ -53,6 +52,17 @@ public final class Constants {
 
     /** Replaying from a log file. */
     REPLAY
+  }
+
+  /** Driver controller mappings that may differ between real hardware and desktop simulation. */
+  public static class DriverController {
+    /**
+     * Raw axis used for omega in SIM.
+     *
+     * <p>Some controllers (for example GameSir on desktop sim) map right-stick X to axis 2 instead
+     * of the Xbox-standard axis used by {@code getRightX()}.
+     */
+    public static final int simOmegaAxis = 2;
   }
 
   public static class IntakeConstants {
@@ -86,19 +96,20 @@ public final class Constants {
   public static class SuperstructureConstants {
     public static class TurretConstants {
       public static final int canId = 60;
-      public static final String canBus = "*";
+      public static final String canBus = "";
       public static final double reduction = 40.66;
 
       public static class HallEffectDegrees {
-        public static final double leftHall = 0;
-        public static final double middleHall = 135;
-        public static final double rightHall = 270;
+        public static final double leftHall = 120;
+        public static final double middleHall = 0;
+        public static final double rightHall = 240;
       }
     }
 
     public static class ShooterConstants {
       public static class FlywheelConstants {
         public static final int canId = 51;
+        public static final int followerCanId = 53;
         public static final String canBus = "*";
         public static final double stepUp = 1.0;
       }
@@ -111,7 +122,9 @@ public final class Constants {
     }
 
     public static class IndexerConstants {
-      public static final double reduction = 1.0;
+      public static final int canId = 54;
+      public static final String canBus = "*";
+      public static final double reduction = 53;
     }
   }
 }
