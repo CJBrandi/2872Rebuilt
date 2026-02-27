@@ -20,6 +20,7 @@ public class TurretVisualizer {
   public static void update(double turretAngleRad) {
     Pose2d robotPose = RobotState.getInstance().getRobotPose();
     double robotAngleRad = robotPose.getRotation().getRadians();
+    // Rotation2d convention is CCW-positive, so field = robot + turret-relative.
     double turretFieldAngle = turretAngleRad + robotAngleRad;
 
     Pose3d robotPose3d =

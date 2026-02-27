@@ -28,7 +28,6 @@ import frc.robot.subsystems.drive.*;
 import frc.robot.subsystems.elevator.Elevator;
 import frc.robot.subsystems.elevator.ElevatorIO;
 import frc.robot.subsystems.elevator.ElevatorIOSim;
-import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.intake.Pivot;
 import frc.robot.subsystems.intake.PivotIO;
 import frc.robot.subsystems.intake.PivotIOSim;
@@ -45,12 +44,7 @@ import frc.robot.subsystems.superstructure.turret.Turret;
 import frc.robot.subsystems.superstructure.turret.TurretIO;
 import frc.robot.subsystems.superstructure.turret.TurretIOSim;
 import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
-import frc.robot.subsystems.vision.Detection;
-import frc.robot.subsystems.vision.DetectionIO;
-import frc.robot.subsystems.vision.DetectionIOSim;
-import frc.robot.subsystems.vision.Tag;
-import frc.robot.subsystems.vision.TagIO;
-import frc.robot.subsystems.vision.TagIOPhotonVisionSim;
+import frc.robot.subsystems.vision.*;
 import frc.robot.util.FuelSim;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
@@ -82,6 +76,11 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+    TagCameraConfig runtimeCamera0Config =
+        camera0Config.withTurretAngleAtTimestamp(
+            timestampSeconds -> RobotState.getInstance().getTurretAngleAtTime(timestampSeconds));
+    TagCameraConfig runtimeCamera1Config = camera1Config;
+
     switch (Constants.currentMode) {
       case REAL:
         /*
@@ -135,7 +134,7 @@ public class RobotContainer {
 
         tag =
             new Tag(
-                drive::addVisionMeasurement, new TagIOPhotonVision(camera0Name, robotToCamera0));
+                drive::addVisionMeasurement, new TagIOPhotonVision(camera0Config));
 
         detection = new Detection(drive::getPose, new DetectionIOLimeLight("limelight", "fuel"));
 
@@ -170,17 +169,12 @@ public class RobotContainer {
                         Constants.SuperstructureConstants.IndexerConstants.canId,
                         Constants.SuperstructureConstants.IndexerConstants.canBus)));
 
-        elevator = new Elevator(new ElevatorIOSim());
+        elevator = new Elevator(new ElevatorIO() {});
 
         pivot = new Pivot(new PivotIOSim());
         roller = new Roller(new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
-
-        tag =
-            new Tag(
-                drive::addVisionMeasurement,
-                new TagIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
-                new TagIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
-        detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
+        tag = new Tag(drive::addVisionMeasurement, new TagIOPhotonVision(runtimeCamera0Config));
+        detection = new Detection(drive::getPose, new DetectionIO() {});
 
         break;
 
@@ -208,8 +202,8 @@ public class RobotContainer {
         tag =
             new Tag(
                 drive::addVisionMeasurement,
-                new TagIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
-                new TagIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
+                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose),
+                new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose));
         detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
         break;
 
@@ -308,7 +302,10 @@ public class RobotContainer {
         "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
     autoChooser.addOption(
         "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
-    autoChooser.addOption("Elevator Static Characterization", elevator.staticCharacterization(2));
+    autoChooser.addOption(
+        "Elevator Static Characterization Up", elevator.staticCharacterization(2));
+    autoChooser.addOption(
+        "Elevator Static Characterization Down", elevator.staticCharacterization(-2));
     autoChooser.addOption("Elevator Homing", elevator.homingSequence());
 
     // Hood characterization/homing routines
@@ -354,6 +351,16 @@ public class RobotContainer {
             this::getDriverOmegaInput));
 
     controller
+        .b()
+        .onTrue(
+            Commands.runOnce(
+                    () ->
+                        drive.setPose(
+                            new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
+                    drive)
+                .ignoringDisable(true));
+
+    controller
         .x()
         .onTrue(
             Commands.runOnce(
@@ -388,24 +395,11 @@ public class RobotContainer {
     controller.pov(0).onTrue(elevator.setTarget(Elevator.Target.UP));
     controller.pov(90).onTrue(elevator.setTarget(Elevator.Target.TRANSITION));
     controller.pov(180).onTrue(elevator.setTarget(Elevator.Target.DOWN));
+    controller.pov(270).onTrue(elevator.setTarget(Elevator.Target.AUTO));
 
     // Intake control
     controller.y().whileTrue(new FullAutoFuelPickupCommand(drive, pivot, roller));
 
-    controller
-        .b()
-        .whileTrue(
-            Commands.runEnd(
-                () -> {
-                  pivot.setGoal(() -> Intake.groundAngle);
-                  roller.runIntake();
-                },
-                () -> {
-                  pivot.setGoal(() -> Intake.stowedAngle);
-                  roller.stop();
-                },
-                pivot,
-                roller));
     controller.rightBumper().whileTrue(Commands.runEnd(roller::runEject, roller::stop, roller));
   }
 

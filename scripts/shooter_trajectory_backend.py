@@ -37,11 +37,11 @@ class ShooterConfig:
     """Configuration for the shooter trajectory solver."""
 
     # Target parameters
-    target_height: float = 72.0 * 0.0254  # 1.829 m (72 inches)
+    target_height: float = 60.0 * 0.0254  # 1.829 m (72 inches)
 
     # Hexagon funnel geometry
     hexagon_opening_diameter: float = 42.0 * 0.0254  # 1.067 m (42 inches point-to-point)
-    wall_angle_deg: float = 25.0  # degrees from vertical (max entry angle)
+    wall_angle_deg: float = 35.0  # degrees from vertical (max entry angle)
 
     # Game piece physics (2026 ball)
     ball_mass: float = 0.227  # kg (0.5 lbs)

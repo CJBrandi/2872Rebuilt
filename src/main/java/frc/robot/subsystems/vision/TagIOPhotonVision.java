@@ -11,7 +11,9 @@ import static frc.robot.subsystems.vision.VisionConstants.*;
 
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.wpilibj.Timer;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -21,27 +23,50 @@ import org.photonvision.PhotonCamera;
 /** IO implementation for real PhotonVision hardware. */
 public class TagIOPhotonVision implements TagIO {
   protected final PhotonCamera camera;
-  protected final Transform3d robotToCamera;
+  protected final TagCameraConfig cameraConfig;
 
   /**
    * Creates a new TagIOPhotonVision.
+   *
+   * @param cameraConfig Per-camera configuration.
+   */
+  public TagIOPhotonVision(TagCameraConfig cameraConfig) {
+    camera = new PhotonCamera(cameraConfig.name());
+    this.cameraConfig = cameraConfig;
+  }
+
+  /**
+   * Creates a new TagIOPhotonVision with a fixed transform.
    *
    * @param name The configured name of the camera.
    * @param robotToCamera The 3D position of the camera relative to the robot.
    */
   public TagIOPhotonVision(String name, Transform3d robotToCamera) {
-    camera = new PhotonCamera(name);
-    this.robotToCamera = robotToCamera;
+    this(TagCameraConfig.fixed(name, robotToCamera));
   }
 
   @Override
   public void updateInputs(TagIOInputs inputs) {
     inputs.connected = camera.isConnected();
+    double now = Timer.getFPGATimestamp();
+    inputs.cameraRobotRelativePose = new Pose3d().plus(cameraConfig.robotToCamera(now));
+    inputs.turretMounted = cameraConfig.isTurretMounted();
+    if (inputs.turretMounted) {
+      Transform3d robotToTurretAxis = cameraConfig.robotToTurretAxis(now).orElseThrow();
+      inputs.turretRobotRelativePose = new Pose3d().plus(robotToTurretAxis);
+      inputs.turretAxisRobotRelativePose =
+          new Pose3d(robotToTurretAxis.getTranslation(), Rotation3d.kZero);
+    } else {
+      inputs.turretRobotRelativePose = new Pose3d();
+      inputs.turretAxisRobotRelativePose = new Pose3d();
+    }
 
     // Read new camera observations
     Set<Short> tagIds = new HashSet<>();
     List<PoseObservation> poseObservations = new LinkedList<>();
     for (var result : camera.getAllUnreadResults()) {
+      Transform3d robotToCamera = cameraConfig.robotToCamera(result.getTimestampSeconds());
+
       // Update latest target observation
       if (result.hasTargets()) {
         inputs.latestTargetObservation =

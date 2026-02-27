@@ -83,9 +83,9 @@ public final class Constants {
     public static final int followerCanId = 62;
     public static final String canBus = "";
 
-    public static final double upPositionMeters = 0.31; // 0.31
+    public static final double upPositionMeters = 0.32; // 0.32
     public static final double transitionPositionMeters = 0.270129;
-    public static final double autoPositionMeters = 0.15;
+    public static final double autoPositionMeters = 0.10;
     public static final double downPositionMeters = 0.0; // 0.0
 
     // Simulation constants

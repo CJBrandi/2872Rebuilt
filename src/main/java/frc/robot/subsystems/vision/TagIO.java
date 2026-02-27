@@ -17,6 +17,10 @@ public interface TagIO {
     public boolean connected = false;
     public TargetObservation latestTargetObservation =
         new TargetObservation(Rotation2d.kZero, Rotation2d.kZero);
+    public Pose3d cameraRobotRelativePose = new Pose3d();
+    public boolean turretMounted = false;
+    public Pose3d turretAxisRobotRelativePose = new Pose3d();
+    public Pose3d turretRobotRelativePose = new Pose3d();
     public PoseObservation[] poseObservations = new PoseObservation[0];
     public int[] tagIds = new int[0];
   }

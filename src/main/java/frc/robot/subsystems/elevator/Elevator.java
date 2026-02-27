@@ -75,11 +75,11 @@ public class Elevator extends SubsystemBase {
   static {
     switch (Constants.getCurrentMode()) {
       case REAL -> {
-        kP.initDefault(700);
-        kI.initDefault(5);
-        kD.initDefault(25);
-        kS.initDefault(2.5);
-        kG.initDefault(10);
+        kP.initDefault(100);
+        kI.initDefault(0);
+        kD.initDefault(8);
+        kS.initDefault(2.0);
+        kG.initDefault(-10);
         kA.initDefault(0);
       }
       case SIM, REPLAY -> {
@@ -216,7 +216,7 @@ public class Elevator extends SubsystemBase {
       io.runPosition(
           setpoint.position / sprocketRadius + homedPosition,
           kS.get() * Math.signum(setpoint.velocity)
-              + (target != Target.UP ? kG.get() : 0)
+              + (setpoint.position < getPositionMeters() ? kG.get() : 0)
               + (kA.get() * accelerationMetersPerSec2));
       // Check at goal
       atGoal =
@@ -343,10 +343,12 @@ public class Elevator extends SubsystemBase {
   }
 
   public void runVolts(double volts) {
+    stopProfile = true;
     io.runVolts(volts);
   }
 
   public void runOpenLoop(double amps) {
+    stopProfile = true;
     io.runOpenLoop(amps);
   }
 }

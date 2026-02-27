@@ -14,11 +14,14 @@ import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.RobotState;
 import frc.robot.subsystems.vision.TagIO.PoseObservationType;
 import java.util.LinkedList;
 import java.util.List;
@@ -69,6 +72,8 @@ public class Tag extends SubsystemBase {
     List<Pose3d> allRobotPoses = new LinkedList<>();
     List<Pose3d> allRobotPosesAccepted = new LinkedList<>();
     List<Pose3d> allRobotPosesRejected = new LinkedList<>();
+    List<Pose3d> allCameraFieldPoses = new LinkedList<>();
+    Pose3d robotFieldPose = new Pose3d(RobotState.getInstance().getRobotPose());
 
     // Loop over cameras
     for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
@@ -127,16 +132,15 @@ public class Tag extends SubsystemBase {
           linearStdDev *= linearStdDevMegatag2Factor;
           angularStdDev *= angularStdDevMegatag2Factor;
         }
-        if (cameraIndex < cameraStdDevFactors.length) {
-          linearStdDev *= cameraStdDevFactors[cameraIndex];
-          angularStdDev *= cameraStdDevFactors[cameraIndex];
-        }
+        double cameraStdDevFactor = getCameraStdDevFactor(cameraIndex);
+        linearStdDev *= cameraStdDevFactor;
+        angularStdDev *= cameraStdDevFactor;
 
         // Send vision observation
         consumer.accept(
             observation.pose().toPose2d(),
             observation.timestamp(),
-            VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
+            VecBuilder.fill(linearStdDev, linearStdDev, Double.POSITIVE_INFINITY));
       }
 
       // Log camera metadata
@@ -152,10 +156,65 @@ public class Tag extends SubsystemBase {
       Logger.recordOutput(
           "Tag/Camera" + Integer.toString(cameraIndex) + "/RobotPosesRejected",
           robotPosesRejected.toArray(new Pose3d[0]));
+      Logger.recordOutput(
+          "Tag/Camera" + Integer.toString(cameraIndex) + "/CameraRobotRelativePose",
+          inputs[cameraIndex].cameraRobotRelativePose);
+
+      Pose3d cameraFieldPose =
+          robotFieldPose.plus(
+              new Transform3d(
+                  inputs[cameraIndex].cameraRobotRelativePose.getTranslation(),
+                  inputs[cameraIndex].cameraRobotRelativePose.getRotation()));
+      Logger.recordOutput(
+          "Tag/Camera" + Integer.toString(cameraIndex) + "/CameraFieldPose", cameraFieldPose);
+
+      Translation3d cameraForwardMeters =
+          new Translation3d(0.4, 0.0, 0.0).rotateBy(cameraFieldPose.getRotation());
+      Pose3d cameraForwardEndpoint =
+          new Pose3d(
+              cameraFieldPose.getTranslation().plus(cameraForwardMeters),
+              cameraFieldPose.getRotation());
+      Logger.recordOutput(
+          "Tag/Camera" + Integer.toString(cameraIndex) + "/CameraForwardAxis",
+          cameraFieldPose,
+          cameraForwardEndpoint);
+
+      if (inputs[cameraIndex].turretMounted) {
+        Logger.recordOutput(
+            "Tag/Camera" + Integer.toString(cameraIndex) + "/TurretAxisRobotRelativePose",
+            inputs[cameraIndex].turretAxisRobotRelativePose);
+        Logger.recordOutput(
+            "Tag/Camera" + Integer.toString(cameraIndex) + "/TurretPositionRobotRelativePose",
+            inputs[cameraIndex].turretRobotRelativePose);
+
+        Pose3d turretAxisFieldPose =
+            robotFieldPose.plus(
+                new Transform3d(
+                    inputs[cameraIndex].turretAxisRobotRelativePose.getTranslation(),
+                    inputs[cameraIndex].turretAxisRobotRelativePose.getRotation()));
+        Pose3d turretPositionFieldPose =
+            robotFieldPose.plus(
+                new Transform3d(
+                    inputs[cameraIndex].turretRobotRelativePose.getTranslation(),
+                    inputs[cameraIndex].turretRobotRelativePose.getRotation()));
+
+        Logger.recordOutput(
+            "Tag/Camera" + Integer.toString(cameraIndex) + "/TurretAxisFieldPose",
+            turretAxisFieldPose);
+        Logger.recordOutput(
+            "Tag/Camera" + Integer.toString(cameraIndex) + "/TurretPositionFieldPose",
+            turretPositionFieldPose);
+        Logger.recordOutput(
+            "Tag/Camera" + Integer.toString(cameraIndex) + "/TurretAxisToCamera",
+            turretAxisFieldPose,
+            cameraFieldPose);
+      }
+
       allTagPoses.addAll(tagPoses);
       allRobotPoses.addAll(robotPoses);
       allRobotPosesAccepted.addAll(robotPosesAccepted);
       allRobotPosesRejected.addAll(robotPosesRejected);
+      allCameraFieldPoses.add(cameraFieldPose);
     }
 
     // Log summary data
@@ -165,6 +224,7 @@ public class Tag extends SubsystemBase {
         "Tag/Summary/RobotPosesAccepted", allRobotPosesAccepted.toArray(new Pose3d[0]));
     Logger.recordOutput(
         "Tag/Summary/RobotPosesRejected", allRobotPosesRejected.toArray(new Pose3d[0]));
+    Logger.recordOutput("Tag/Summary/CameraFieldPoses", allCameraFieldPoses.toArray(new Pose3d[0]));
   }
 
   @FunctionalInterface

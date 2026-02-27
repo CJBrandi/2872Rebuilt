@@ -11,6 +11,7 @@ import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.util.Units;
 
 public class VisionConstants {
@@ -18,16 +19,22 @@ public class VisionConstants {
   public static AprilTagFieldLayout aprilTagLayout =
       AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
 
-  // Camera names, must match names configured on coprocessor
-  public static String camera0Name = "camera_0";
-  public static String camera1Name = "camera_1";
+  // Tag camera configurations
+  public static final TagCameraConfig camera0Config =
+      TagCameraConfig.turretMounted(
+          "camera_0",
+          new TagCameraConfig.TurretMountSettings(
+              new Translation3d(Units.inchesToMeters(0.25), 0.0, 0.419),
+              new Translation3d(Units.inchesToMeters(8.532), 0.0, 0.0),
+              new Rotation3d(0.0, -0.2261799, 0.0)),
+          1.0);
 
-  // Robot to camera transforms
-  // (Not used by Limelight, configure in web UI instead)
-  public static Transform3d robotToCamera0 =
-      new Transform3d(-0.0254, -0.3937, 0.419, new Rotation3d(0.0, -0.2261799, 3 * (Math.PI / 2)));
-  public static Transform3d robotToCamera1 =
-      new Transform3d(-0.2, 0.0, 0.2, new Rotation3d(0.0, -0.4, Math.PI));
+  public static final TagCameraConfig camera1Config =
+      TagCameraConfig.fixed(
+          "camera_1", new Transform3d(-0.2, 0.0, 0.2, new Rotation3d(0.0, -0.4, Math.PI)), 1.0);
+
+  public static final TagCameraConfig[] tagCameraConfigs =
+      new TagCameraConfig[] {camera0Config, camera1Config};
 
   public static Transform3d robotToDetectionCamera =
       new Transform3d(
@@ -45,13 +52,13 @@ public class VisionConstants {
   public static double linearStdDevBaseline = 0.02; // Meters
   public static double angularStdDevBaseline = 0.06; // Radians
 
-  // Standard deviation multipliers for each camera
-  // (Adjust to trust some cameras more than others)
-  public static double[] cameraStdDevFactors =
-      new double[] {
-        1.0, // Camera 0
-        1.0 // Camera 1
-      };
+  /** Returns the configured standard-deviation scale factor for a camera index. */
+  public static double getCameraStdDevFactor(int cameraIndex) {
+    if (cameraIndex < 0 || cameraIndex >= tagCameraConfigs.length) {
+      return 1.0;
+    }
+    return tagCameraConfigs[cameraIndex].stdDevFactor();
+  }
 
   // Multipliers to apply for MegaTag 2 observations
   public static double linearStdDevMegatag2Factor = 0.5; // More stable than full 3D solve

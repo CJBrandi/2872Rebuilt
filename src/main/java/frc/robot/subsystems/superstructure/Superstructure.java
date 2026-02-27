@@ -37,6 +37,8 @@ public class Superstructure extends SubsystemBase {
       turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
     }
 
+    indexer.runVelocityRPM(20);
+
     shooter.periodic();
     turret.periodic();
     indexer.periodic();

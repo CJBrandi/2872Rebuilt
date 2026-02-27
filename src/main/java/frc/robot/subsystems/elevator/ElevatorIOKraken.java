@@ -27,7 +27,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
 
 public class ElevatorIOKraken implements ElevatorIO {
-  public static final double reduction = 5;
+  public static final double reduction = 7.75;
   // box not including the sproket
 
   // Hardware
