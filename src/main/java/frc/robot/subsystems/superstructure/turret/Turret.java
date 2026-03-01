@@ -136,7 +136,6 @@ public class Turret {
 
     // Handle disabled state - brake and reset profile
     if (DriverStation.isDisabled()) {
-      turretIO.setBrakeMode(true);
       turretIO.stop();
       double clampedAngle = clampToLimitsRad(inputs.motorEncoderPosition.getRadians());
       setpoint = new TrapezoidProfile.State(clampedAngle, 0.0);

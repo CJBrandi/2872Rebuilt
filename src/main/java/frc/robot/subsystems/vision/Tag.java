@@ -23,6 +23,7 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.subsystems.vision.TagIO.PoseObservationType;
+import frc.robot.util.LoggedTunableNumber;
 import java.util.LinkedList;
 import java.util.List;
 import org.littletonrobotics.junction.Logger;
@@ -32,6 +33,7 @@ public class Tag extends SubsystemBase {
   private final TagIO[] io;
   private final TagIOInputsAutoLogged[] inputs;
   private final Alert[] disconnectedAlerts;
+  private final LoggedTunableNumber[] poseEstimationEnabledTunables;
 
   public Tag(TagConsumer consumer, TagIO... io) {
     this.consumer = consumer;
@@ -48,6 +50,13 @@ public class Tag extends SubsystemBase {
     for (int i = 0; i < inputs.length; i++) {
       disconnectedAlerts[i] =
           new Alert("Tag camera " + Integer.toString(i) + " is disconnected.", AlertType.kWarning);
+    }
+
+    this.poseEstimationEnabledTunables = new LoggedTunableNumber[io.length];
+    for (int i = 0; i < io.length; i++) {
+      poseEstimationEnabledTunables[i] =
+          new LoggedTunableNumber(
+              "Tag/Camera" + Integer.toString(i) + "/PoseEstimationEnabled", 1.0);
     }
   }
 
@@ -79,6 +88,7 @@ public class Tag extends SubsystemBase {
     for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
       // Update disconnected alert
       disconnectedAlerts[cameraIndex].set(!inputs[cameraIndex].connected);
+      boolean poseEstimationEnabled = poseEstimationEnabledTunables[cameraIndex].get() > 0.5;
 
       // Initialize logging values
       List<Pose3d> tagPoses = new LinkedList<>();
@@ -137,10 +147,12 @@ public class Tag extends SubsystemBase {
         angularStdDev *= cameraStdDevFactor;
 
         // Send vision observation
-        consumer.accept(
-            observation.pose().toPose2d(),
-            observation.timestamp(),
-            VecBuilder.fill(linearStdDev, linearStdDev, Double.POSITIVE_INFINITY));
+        if (poseEstimationEnabled) {
+          consumer.accept(
+              observation.pose().toPose2d(),
+              observation.timestamp(),
+              VecBuilder.fill(linearStdDev, linearStdDev, Double.POSITIVE_INFINITY));
+        }
       }
 
       // Log camera metadata
@@ -159,6 +171,9 @@ public class Tag extends SubsystemBase {
       Logger.recordOutput(
           "Tag/Camera" + Integer.toString(cameraIndex) + "/CameraRobotRelativePose",
           inputs[cameraIndex].cameraRobotRelativePose);
+      Logger.recordOutput(
+          "Tag/Camera" + Integer.toString(cameraIndex) + "/PoseEstimationEnabled",
+          poseEstimationEnabled);
 
       Pose3d cameraFieldPose =
           robotFieldPose.plus(

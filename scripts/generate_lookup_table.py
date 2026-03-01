@@ -41,7 +41,7 @@ def ensure_parent_dir(path: str) -> None:
 
 def generate_lookup_table(
     min_distance: float = 1.5,
-    max_distance: float = 6.0,
+    max_distance: float = 15.0,
     step: float = 0.1,
     config: Optional[ShooterConfig] = None,
     verbose: bool = True,
@@ -74,7 +74,9 @@ def generate_lookup_table(
         print("Configuration:")
         print(f"  Target height:     {config.target_height:.3f} m ({config.target_height / 0.0254:.1f} in)")
         print(f"  Shooter height:    {config.shooter_height:.3f} m ({config.shooter_height / 0.0254:.1f} in)")
-        print(f"  Max entry angle:   {config.wall_angle_deg:.1f}° from vertical")
+        print(f"  Wall angle limit:  {config.wall_angle_deg:.1f}° from vertical")
+        print(f"  Entry margin:      {config.entry_angle_margin_deg:.1f}°")
+        print(f"  Effective entry:   {config.effective_entry_angle_deg:.1f}° from vertical")
         print(f"  Ball mass:         {config.ball_mass:.3f} kg")
         print(f"  Ball diameter:     {config.ball_diameter * 1000:.1f} mm")
         print(f"  Drag coefficient:  {config.drag_coefficient}")
@@ -132,6 +134,8 @@ def generate_lookup_table(
             "target_height_m": config.target_height,
             "shooter_height_m": config.shooter_height,
             "max_entry_angle_deg": config.wall_angle_deg,
+            "entry_angle_margin_deg": config.entry_angle_margin_deg,
+            "effective_entry_angle_deg": config.effective_entry_angle_deg,
             "ball_mass_kg": config.ball_mass,
             "ball_diameter_m": config.ball_diameter,
             "drag_coefficient": config.drag_coefficient,
@@ -220,11 +224,19 @@ def main():
     )
     parser.add_argument(
         "--target-height", type=float, default=None,
-        help="Target height in meters (default: 72 inches)"
+        help="Target height in meters (default: 56 3/8 inches)"
     )
     parser.add_argument(
         "--shooter-height", type=float, default=None,
         help="Shooter height in meters (default: 20 inches)"
+    )
+    parser.add_argument(
+        "--entry-angle", type=float, default=None,
+        help="Maximum wall entry angle from vertical in degrees (default: 45°)"
+    )
+    parser.add_argument(
+        "--entry-angle-margin", type=float, default=None,
+        help="Safety margin below wall angle in degrees (default: 5°)"
     )
     parser.add_argument(
         "--quiet", "-q", action="store_true",
@@ -239,6 +251,10 @@ def main():
         config.target_height = args.target_height
     if args.shooter_height is not None:
         config.shooter_height = args.shooter_height
+    if args.entry_angle is not None:
+        config.wall_angle_deg = args.entry_angle
+    if args.entry_angle_margin is not None:
+        config.entry_angle_margin_deg = args.entry_angle_margin
 
     # Generate lookup table
     lookup_table = generate_lookup_table(

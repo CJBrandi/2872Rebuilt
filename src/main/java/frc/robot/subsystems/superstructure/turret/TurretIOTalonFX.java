@@ -153,14 +153,6 @@ public class TurretIOTalonFX implements TurretIO {
   }
 
   @Override
-  public void setBrakeMode(boolean enabled) {
-    var motorOutputConfig = new com.ctre.phoenix6.configs.MotorOutputConfigs();
-    talon.getConfigurator().refresh(motorOutputConfig);
-    motorOutputConfig.NeutralMode = enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-    talon.getConfigurator().apply(motorOutputConfig);
-  }
-
-  @Override
   public void setPosition(double degrees) {
     talon.setPosition(Units.degreesToRotations(degrees));
   }

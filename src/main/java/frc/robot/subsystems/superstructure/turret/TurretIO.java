@@ -31,7 +31,5 @@ public interface TurretIO {
 
   default void setPID(double kP, double kI, double kD) {}
 
-  default void setBrakeMode(boolean enabled) {}
-
   default void setPosition(double degrees) {}
 }

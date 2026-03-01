@@ -125,11 +125,6 @@ public class TurretIOSim implements TurretIO {
     simState = VecBuilder.fill(Math.toRadians(degrees), 0.0);
   }
 
-  @Override
-  public void setBrakeMode(boolean enabled) {
-    // No-op in simulation
-  }
-
   private void setInputTorqueCurrent(double torqueCurrent) {
     inputTorqueCurrent = MathUtil.clamp(torqueCurrent, -40.0, 40.0);
     appliedVolts = gearbox.getVoltage(gearbox.getTorque(inputTorqueCurrent), simState.get(1, 0));

@@ -22,12 +22,13 @@ public class Flywheel {
   // Feedforward gains for torque current control (Amps)
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Shooter/Flywheel/kS", 0.0);
   // kV in Amps per rotation per second
-  private static final LoggedTunableNumber kV = new LoggedTunableNumber("Shooter/Flywheel/kV", 0.45);
+  private static final LoggedTunableNumber kV =
+      new LoggedTunableNumber("Shooter/Flywheel/kV", 0.2);
 
   // Efficiency coefficient: accounts for friction between wheels and ball
   // exitVelocity = wheelSurfaceVelocity * efficiency
   private static final LoggedTunableNumber efficiency =
-      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.676);
+      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.676); //0.676
 
   // Slew rate limiter parameters (rad/s per second)
   private static final LoggedTunableNumber maxAccelRadPerSec2 =

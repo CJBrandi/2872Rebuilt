@@ -29,6 +29,9 @@ public class Superstructure extends SubsystemBase {
 
   @Override
   public void periodic() {
+    indexer.periodic();
+    shooter.periodic();
+    turret.periodic();
     // Get shooting parameters from calculator
     var params = shotCalculator.getParameters();
 
@@ -37,13 +40,18 @@ public class Superstructure extends SubsystemBase {
       turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
     }
 
-    indexer.runVelocityRPM(20);
+    /*
+       boolean readyToShoot = isReadyToShoot();
+       if (readyToShoot) {
+         indexer.runIntakeVelocity();
+       } else {
+         indexer.stop();
+       }
 
-    shooter.periodic();
-    turret.periodic();
-    indexer.periodic();
+    */
+    indexer.runIntakeVelocity();
 
-    Logger.recordOutput("Superstructure/ReadyToShoot", isReadyToShoot());
+    // Logger.recordOutput("Superstructure/ReadyToShoot", readyToShoot);
     Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);
   }
 

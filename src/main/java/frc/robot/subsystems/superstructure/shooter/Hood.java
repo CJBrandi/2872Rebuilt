@@ -49,10 +49,10 @@ public class Hood {
   static {
     switch (Constants.getCurrentMode()) {
       case REAL -> {
-        kP.initDefault(1500);
-        kD.initDefault(0.0);
+        kP.initDefault(2500);
+        kD.initDefault(40);
         kS.initDefault(5);
-        kG.initDefault(0);
+        kG.initDefault(5);
         maxVelocityDegPerSec.initDefault(180);
         maxAccelerationDegPerSec2.initDefault(360);
       }
@@ -138,9 +138,7 @@ public class Hood {
       // Check if at goal (compare actual position, not profile setpoint)
       atGoal =
           EqualsUtil.epsilonEquals(
-                  inputs.positionRad, goalState.position, Units.degreesToRadians(0.5))
-              && EqualsUtil.epsilonEquals(
-                  inputs.velocityRadPerSec, goalState.velocity, Units.degreesToRadians(5.0));
+              inputs.positionRad, goalState.position, Units.degreesToRadians(0.5));
     } else {
       atGoal = false;
     }

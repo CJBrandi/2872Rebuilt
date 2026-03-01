@@ -37,6 +37,8 @@ public class Indexer {
       new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber manualIndexerRPM =
       new LoggedTunableNumber("Manual/IndexerRPM", 0.0);
+  private static final LoggedTunableNumber intakeRPM =
+      new LoggedTunableNumber("Superstructure/Indexer/IntakeRPM");
 
   static {
     switch (Constants.getCurrentMode()) {
@@ -61,6 +63,7 @@ public class Indexer {
         staticCharacterizationVelocityThresh.initDefault(0.1);
       }
     }
+    intakeRPM.initDefault(20.0);
   }
 
   private final IndexerIO io;
@@ -144,6 +147,7 @@ public class Indexer {
         "Superstructure/Indexer/StaticCharacterizationActive", staticCharacterizationActive);
     Logger.recordOutput("Superstructure/Indexer/ManualMode", manualMode);
     Logger.recordOutput("Superstructure/Indexer/Manual/TargetRPM", manualIndexerRPM.get());
+    Logger.recordOutput("Superstructure/Indexer/IntakeTargetRPM", intakeRPM.get());
   }
 
   /** Runs closed-loop velocity (rad/s). */
@@ -161,6 +165,11 @@ public class Indexer {
   /** Runs closed-loop velocity (RPM). */
   public void runVelocityRPM(double velocityRPM) {
     runVelocity(Units.rotationsPerMinuteToRadiansPerSecond(velocityRPM));
+  }
+
+  /** Runs the configured superstructure intake/feed RPM setpoint. */
+  public void runIntakeVelocity() {
+    runVelocityRPM(intakeRPM.get());
   }
 
   public void runVolts(double volts) {
