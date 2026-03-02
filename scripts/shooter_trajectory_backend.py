@@ -37,12 +37,8 @@ class ShooterConfig:
     """Configuration for the shooter trajectory solver."""
 
     # Target parameters
-    target_height: float = 52.5 * 0.0254  # 1.432 m (56 3/8 inches, no top funnel)
-
-    # Hexagon funnel geometry
-    hexagon_opening_diameter: float = 42.0 * 0.0254  # 1.067 m (42 inches point-to-point)
-    wall_angle_deg: float = 30.0  # degrees from vertical (max wall angle)
-    entry_angle_margin_deg: float = 5.0  # safety margin below wall angle
+    target_height: float = 65.825 * 0.0254  # 1.432 m (56 3/8 inches)
+    max_entry_angle_deg: float = 30.0  # max allowed angle from vertical at target
 
     # Game piece physics (2026 ball)
     ball_mass: float = 0.227  # kg (0.5 lbs)
@@ -51,7 +47,7 @@ class ShooterConfig:
     air_density: float = 1.204  # kg/m³ at sea level
 
     # Shooter configuration
-    shooter_height: float = 20.0 * 0.0254  # 0.508 m (20 inches)
+    shooter_height: float = 21.0 * 0.0254  # 0.508 m (20 inches)
 
     # Optimization parameters
     num_timesteps: int = 50
@@ -67,20 +63,8 @@ class ShooterConfig:
         return math.pi * self.ball_radius ** 2
 
     @property
-    def wall_angle_rad(self) -> float:
-        return math.radians(self.wall_angle_deg)
-
-    @property
-    def effective_entry_angle_deg(self) -> float:
-        return self.wall_angle_deg - self.entry_angle_margin_deg
-
-    @property
-    def effective_entry_angle_rad(self) -> float:
-        return math.radians(self.effective_entry_angle_deg)
-
-    @property
-    def hexagon_circumradius(self) -> float:
-        return self.hexagon_opening_diameter / 2.0
+    def max_entry_angle_rad(self) -> float:
+        return math.radians(self.max_entry_angle_deg)
 
 
 @dataclass
@@ -178,13 +162,8 @@ def solve_trajectory(
     """
     if config is None:
         config = ShooterConfig()
-    if config.entry_angle_margin_deg < 0.0:
-        raise ValueError("entry_angle_margin_deg must be >= 0.")
-    if config.effective_entry_angle_deg <= 0.0:
-        raise ValueError(
-            "effective entry angle must be > 0 degrees. "
-            "Reduce entry_angle_margin_deg or increase wall_angle_deg."
-        )
+    if not (0.0 < config.max_entry_angle_deg < 90.0):
+        raise ValueError("max_entry_angle_deg must be between 0 and 90 degrees (exclusive).")
 
     # Create dynamics function
     f = _create_dynamics_function(config)
@@ -259,16 +238,16 @@ def solve_trajectory(
     # 2. Final position at target
     problem.subject_to(p[:, -1:] == target_pos)
 
-    # 3. Entry angle constraint (must enter hexagon funnel)
-    # Ball must be descending and within effective entry angle from vertical
+    # 3. Entry angle constraint at the target point
+    # Ball must be descending and within max entry angle from vertical.
     horizontal_speed_sq = v_x[-1] ** 2 + v_y[-1] ** 2
     vertical_speed = v_z[-1]
 
     # Must be going downward
     problem.subject_to(vertical_speed < 0.0)
 
-    # Entry angle: sqrt(vx² + vy²) / |vz| ≤ tan(effective_entry_angle)
-    max_horizontal_ratio = math.tan(config.effective_entry_angle_rad)
+    # Entry angle: sqrt(vx² + vy²) / |vz| ≤ tan(max_entry_angle)
+    max_horizontal_ratio = math.tan(config.max_entry_angle_rad)
     problem.subject_to(
         horizontal_speed_sq <= vertical_speed ** 2 * max_horizontal_ratio ** 2
     )
@@ -398,11 +377,7 @@ def main():
     )
     parser.add_argument(
         "--entry-angle", type=float, default=None,
-        help="Maximum wall entry angle from vertical in degrees (default: 45°)"
-    )
-    parser.add_argument(
-        "--entry-angle-margin", type=float, default=None,
-        help="Safety margin below wall angle in degrees (default: 5°)"
+        help="Maximum allowed entry angle from vertical in degrees (default: 30°)"
     )
     parser.add_argument(
         "--test", action="store_true",
@@ -419,9 +394,7 @@ def main():
     if args.shooter_height is not None:
         config.shooter_height = args.shooter_height
     if args.entry_angle is not None:
-        config.wall_angle_deg = args.entry_angle
-    if args.entry_angle_margin is not None:
-        config.entry_angle_margin_deg = args.entry_angle_margin
+        config.max_entry_angle_deg = args.entry_angle
 
     # Test mode
     if args.test or (args.horizontal is None and args.vertical is None):
@@ -429,9 +402,7 @@ def main():
         print()
         print(f"Config: target_height={config.target_height:.3f}m, "
               f"shooter_height={config.shooter_height:.3f}m, "
-              f"wall_angle={config.wall_angle_deg}°, "
-              f"entry_margin={config.entry_angle_margin_deg}°, "
-              f"effective_entry_angle={config.effective_entry_angle_deg:.1f}°")
+              f"max_entry_angle={config.max_entry_angle_deg}°")
         print()
 
         for dist in [1.0, 2.0, 3.0, 4.0, 5.0]:

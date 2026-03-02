@@ -174,7 +174,9 @@ public class RobotContainer {
         pivot = new Pivot(new PivotIOSim());
         roller = new Roller(new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
         tag = new Tag(drive::addVisionMeasurement, new TagIOPhotonVision(runtimeCamera0Config));
-        detection = new Detection(drive::getPose, new DetectionIO() {});
+        detection =
+            new Detection(
+                drive::getPose, new DetectionIOLimeLight("limelight", "fuel", drive::getPose));
 
         break;
 

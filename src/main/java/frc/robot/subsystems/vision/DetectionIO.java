@@ -7,6 +7,7 @@ public interface DetectionIO {
   public static class DetectionIOInputs {
     public boolean connected = false;
     public PixelDetection[] detections = new PixelDetection[0];
+    public FieldClusterDetection[] fieldClusters = new FieldClusterDetection[0];
     public double timestampSeconds = 0.0;
   }
 
@@ -17,6 +18,21 @@ public interface DetectionIO {
    */
   public static record PixelDetection(
       double xPx, double yPx, double bboxWidthPx, double bboxHeightPx, double confidence) {}
+
+  /**
+   * Field-relative cluster output provided directly by the vision pipeline.
+   *
+   * <p>Coordinates use the standard field frame (meters). This allows the Rio to skip pixel-space
+   * projection and clustering when available.
+   */
+  public static record FieldClusterDetection(
+      int clusterId,
+      double xMeters,
+      double yMeters,
+      double count,
+      double score,
+      boolean best,
+      double captureTimestampSeconds) {}
 
   /** Track overlay data for optional visualization output. */
   public static record TrackOverlay(

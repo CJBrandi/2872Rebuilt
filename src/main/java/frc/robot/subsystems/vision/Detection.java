@@ -6,12 +6,8 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker.TrackEstimate;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker.TrackerOutput;
 import frc.robot.subsystems.fuelpickup.FuelCameraModel;
 import frc.robot.subsystems.fuelpickup.FuelClusterStabilizer;
 import frc.robot.subsystems.fuelpickup.FuelDbscanClusterer;
@@ -21,24 +17,32 @@ import frc.robot.util.FuelSim;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 /**
  * Fuel detection pipeline subsystem.
  *
- * <p>Pipeline: Pixel detections (IO) -> tracking -> field projection -> DBSCAN clustering ->
- * cluster scoring.
+ * <p>Pipeline:
+ *
+ * <p>1) Preferred path (if available): field-relative clusters from IO -> cluster scoring.
+ *
+ * <p>2) Fallback path: pixel detections (IO) -> field projection -> DBSCAN clustering -> cluster
+ * scoring.
  */
 public class Detection extends SubsystemBase {
-  private record TrackedFieldPoint(int trackId, Translation3d position, double xPx, double yPx) {}
+  private record ProjectedFieldPoint(
+      int pointId, Translation3d position, double xPx, double yPx, double radiusPx) {}
 
   private record ClusterScore(
-      int clusterId, Translation3d centroid, int count, double distanceMeters, double score) {}
+      int clusterId,
+      Translation3d centroid,
+      int count,
+      double distanceMeters,
+      double score,
+      boolean preferred) {}
 
   private final Supplier<Pose2d> robotPoseSupplier;
   private final DetectionIO io;
@@ -52,15 +56,6 @@ public class Detection extends SubsystemBase {
           FuelPickupConstants.frameHeightPx,
           FuelPickupConstants.horizontalFovDeg,
           FuelPickupConstants.verticalFovDeg);
-  private final FuelBallTracker tracker =
-      new FuelBallTracker(
-          FuelPickupConstants.trackerHighConfidence,
-          FuelPickupConstants.trackerLowConfidence,
-          FuelPickupConstants.trackerMatchDistancePx,
-          FuelPickupConstants.trackerSecondPassDistancePx,
-          FuelPickupConstants.trackerSpawnSuppressionDistancePx,
-          FuelPickupConstants.trackerMinConfirmHits,
-          FuelPickupConstants.trackerMaxMissedFrames);
   private final FuelDbscanClusterer clusterer =
       new FuelDbscanClusterer(
           FuelPickupConstants.dbscanEpsilonMeters, FuelPickupConstants.dbscanMinPoints);
@@ -69,7 +64,6 @@ public class Detection extends SubsystemBase {
           FuelPickupConstants.clusterAssociationDistanceMeters,
           FuelPickupConstants.clusterMaxMissedFrames,
           FuelPickupConstants.clusterCentroidEmaAlpha);
-  private final Map<Integer, Translation3d> filteredTrackFieldPoints = new HashMap<>();
 
   public Detection(Supplier<Pose2d> robotPoseSupplier, DetectionIO io) {
     this.robotPoseSupplier = robotPoseSupplier;
@@ -84,35 +78,33 @@ public class Detection extends SubsystemBase {
 
     Pose2d robotPose = robotPoseSupplier.get();
     Pose3d cameraPose = new Pose3d(robotPose).plus(VisionConstants.robotToDetectionCamera);
-    Pose3d cameraRobotRelativePose = new Pose3d().plus(VisionConstants.robotToDetectionCamera);
-    Translation3d cameraRobotRelativeTranslation = cameraRobotRelativePose.getTranslation();
     Logger.recordOutput("Detection/CameraPose", cameraPose);
 
     List<DetectionIO.PixelDetection> pixelDetections = List.of(inputs.detections);
     logDetections(pixelDetections);
+    List<DetectionIO.FieldClusterDetection> fieldClusters = List.of(inputs.fieldClusters);
+    Logger.recordOutput("Detection/Clusters/ExternalCount", fieldClusters.size());
 
-    double timestampSecs =
-        inputs.timestampSeconds > 0.0 ? inputs.timestampSeconds : Timer.getFPGATimestamp();
-    List<FuelBallTracker.Detection> trackerDetections =
-        pixelDetections.stream().map(this::toTrackerDetection).toList();
+    if (!fieldClusters.isEmpty()) {
+      Logger.recordOutput("Detection/Clusters/Source", "limelight_preclustered");
+      processPreclusteredInputs(fieldClusters, pixelDetections, robotPose);
+      return;
+    }
+    Logger.recordOutput("Detection/Clusters/Source", "rio_clustered");
 
-    TrackerOutput trackerOutput = tracker.update(trackerDetections, timestampSecs);
-    logTracking(trackerOutput);
-
-    List<TrackedFieldPoint> trackedFieldPoints =
-        estimateFieldPoints(trackerOutput.confirmedTracks(), cameraPose);
-    logFieldEstimates(trackedFieldPoints);
+    List<ProjectedFieldPoint> projectedFieldPoints = estimateFieldPoints(pixelDetections, cameraPose);
+    logFieldEstimates(projectedFieldPoints);
 
     List<Translation3d> estimatedPositions =
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toList();
+        projectedFieldPoints.stream().map(ProjectedFieldPoint::position).toList();
     ClusterResult clusterResult = clusterer.cluster(estimatedPositions);
-    Map<Integer, List<TrackedFieldPoint>> rawClusterMap =
-        buildClusterMap(trackedFieldPoints, clusterResult.labels());
+    Map<Integer, List<ProjectedFieldPoint>> rawClusterMap =
+        buildClusterMap(projectedFieldPoints, clusterResult.labels());
     Map<Integer, Translation3d> rawClusterCentroids = buildClusterCentroids(rawClusterMap);
     Map<Integer, Integer> rawToStableClusterIds = clusterStabilizer.update(rawClusterCentroids);
-    Map<Integer, List<TrackedFieldPoint>> stableClusterMap =
+    Map<Integer, List<ProjectedFieldPoint>> stableClusterMap =
         remapClusterMap(rawClusterMap, rawToStableClusterIds);
-    int[] stableTrackClusterLabels =
+    int[] stablePointClusterLabels =
         remapTrackClusterLabels(clusterResult.labels(), rawToStableClusterIds);
 
     List<ClusterScore> clusterScores = scoreClusters(stableClusterMap, robotPose);
@@ -123,33 +115,67 @@ public class Detection extends SubsystemBase {
     logClusters(
         clusterResult.clusterCount(),
         stableClusterMap.size(),
-        trackedFieldPoints,
+        projectedFieldPoints,
         clusterResult.labels(),
-        stableTrackClusterLabels,
+        stablePointClusterLabels,
         stableClusterMap,
         clusterScores,
         bestClusterId);
     io.publishSimFrame(
         new DetectionIO.SimFrameData(
             pixelDetections.toArray(DetectionIO.PixelDetection[]::new),
-            buildTrackOverlays(
-                trackerOutput.allTracks(), trackedFieldPoints, stableTrackClusterLabels),
+            buildTrackOverlays(projectedFieldPoints, stablePointClusterLabels),
             buildClusterOverlays(clusterScores)));
   }
 
-  private FuelBallTracker.Detection toTrackerDetection(DetectionIO.PixelDetection detection) {
-    double inferredRadius = Math.max(1.0, 0.5 * detection.bboxWidthPx());
-    return new FuelBallTracker.Detection(
-        detection.xPx(), detection.yPx(), inferredRadius, detection.confidence());
+  private void processPreclusteredInputs(
+      List<DetectionIO.FieldClusterDetection> fieldClusters,
+      List<DetectionIO.PixelDetection> pixelDetections,
+      Pose2d robotPose) {
+    List<ProjectedFieldPoint> projectedFieldPoints = new ArrayList<>(fieldClusters.size());
+    int[] clusterLabels = new int[fieldClusters.size()];
+    Map<Integer, List<ProjectedFieldPoint>> clusterMap = new HashMap<>();
+
+    for (int i = 0; i < fieldClusters.size(); i++) {
+      DetectionIO.FieldClusterDetection cluster = fieldClusters.get(i);
+      Translation3d centroid =
+          new Translation3d(cluster.xMeters(), cluster.yMeters(), FuelSim.getFuelRadiusMeters());
+      ProjectedFieldPoint point = new ProjectedFieldPoint(i, centroid, 0.0, 0.0, 1.0);
+      projectedFieldPoints.add(point);
+      clusterLabels[i] = cluster.clusterId();
+      clusterMap.computeIfAbsent(cluster.clusterId(), ignored -> new ArrayList<>()).add(point);
+    }
+
+    logFieldEstimates(projectedFieldPoints);
+    List<ClusterScore> clusterScores = scorePreclusteredClusters(fieldClusters, robotPose);
+    int bestClusterId = selectBestCluster(clusterScores);
+    publishBestClusterToRobotState(clusterScores);
+    logClusters(
+        fieldClusters.size(),
+        fieldClusters.size(),
+        projectedFieldPoints,
+        clusterLabels,
+        clusterLabels,
+        clusterMap,
+        clusterScores,
+        bestClusterId);
+
+    io.publishSimFrame(
+        new DetectionIO.SimFrameData(
+            pixelDetections.toArray(DetectionIO.PixelDetection[]::new),
+            new DetectionIO.TrackOverlay[0],
+            buildClusterOverlays(clusterScores)));
   }
 
-  private List<TrackedFieldPoint> estimateFieldPoints(
-      List<TrackEstimate> confirmedTracks, Pose3d cameraPose) {
-    List<TrackedFieldPoint> points = new ArrayList<>();
-    Set<Integer> activeTrackIds = new HashSet<>();
-    for (TrackEstimate track : confirmedTracks) {
+  private List<ProjectedFieldPoint> estimateFieldPoints(
+      List<DetectionIO.PixelDetection> pixelDetections, Pose3d cameraPose) {
+    List<ProjectedFieldPoint> points = new ArrayList<>();
+    for (int i = 0; i < pixelDetections.size(); i++) {
+      DetectionIO.PixelDetection detection = pixelDetections.get(i);
       Translation3d groundPoint =
-          cameraModel.backProjectToPlane(track.xPx(), track.yPx(), cameraPose, 0.0).orElse(null);
+          cameraModel
+              .backProjectToPlane(detection.xPx(), detection.yPx(), cameraPose, 0.0)
+              .orElse(null);
       if (groundPoint == null) {
         continue;
       }
@@ -163,41 +189,44 @@ public class Detection extends SubsystemBase {
         continue;
       }
 
-      activeTrackIds.add(track.id());
-      Translation3d filteredPoint = filterFieldPoint(track.id(), fieldPoint);
-      points.add(new TrackedFieldPoint(track.id(), filteredPoint, track.xPx(), track.yPx()));
+      points.add(
+          new ProjectedFieldPoint(
+              i,
+              fieldPoint,
+              detection.xPx(),
+              detection.yPx(),
+              Math.max(1.0, 0.5 * detection.bboxWidthPx())));
     }
-    filteredTrackFieldPoints.keySet().removeIf((trackId) -> !activeTrackIds.contains(trackId));
     return points;
   }
 
-  private Map<Integer, List<TrackedFieldPoint>> buildClusterMap(
-      List<TrackedFieldPoint> trackedFieldPoints, int[] labels) {
-    Map<Integer, List<TrackedFieldPoint>> clusters = new HashMap<>();
-    for (int i = 0; i < trackedFieldPoints.size(); i++) {
+  private Map<Integer, List<ProjectedFieldPoint>> buildClusterMap(
+      List<ProjectedFieldPoint> projectedFieldPoints, int[] labels) {
+    Map<Integer, List<ProjectedFieldPoint>> clusters = new HashMap<>();
+    for (int i = 0; i < projectedFieldPoints.size(); i++) {
       int label = labels[i];
       if (label < 0) {
         continue;
       }
-      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(trackedFieldPoints.get(i));
+      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(projectedFieldPoints.get(i));
     }
     return clusters;
   }
 
   private Map<Integer, Translation3d> buildClusterCentroids(
-      Map<Integer, List<TrackedFieldPoint>> clusterMap) {
+      Map<Integer, List<ProjectedFieldPoint>> clusterMap) {
     Map<Integer, Translation3d> centroids = new HashMap<>();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : clusterMap.entrySet()) {
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : clusterMap.entrySet()) {
       centroids.put(entry.getKey(), average(entry.getValue()));
     }
     return centroids;
   }
 
-  private Map<Integer, List<TrackedFieldPoint>> remapClusterMap(
-      Map<Integer, List<TrackedFieldPoint>> rawClusterMap,
+  private Map<Integer, List<ProjectedFieldPoint>> remapClusterMap(
+      Map<Integer, List<ProjectedFieldPoint>> rawClusterMap,
       Map<Integer, Integer> rawToStableClusterIds) {
-    Map<Integer, List<TrackedFieldPoint>> stableClusters = new HashMap<>();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : rawClusterMap.entrySet()) {
+    Map<Integer, List<ProjectedFieldPoint>> stableClusters = new HashMap<>();
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : rawClusterMap.entrySet()) {
       Integer stableId = rawToStableClusterIds.get(entry.getKey());
       if (stableId == null) {
         continue;
@@ -223,20 +252,42 @@ public class Detection extends SubsystemBase {
   }
 
   private List<ClusterScore> scoreClusters(
-      Map<Integer, List<TrackedFieldPoint>> clusterMap, Pose2d robotPose) {
+      Map<Integer, List<ProjectedFieldPoint>> clusterMap, Pose2d robotPose) {
     List<ClusterScore> scores = new ArrayList<>();
     Translation2d robotTranslation = robotPose.getTranslation();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : clusterMap.entrySet()) {
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : clusterMap.entrySet()) {
       int clusterId = entry.getKey();
-      List<TrackedFieldPoint> points = entry.getValue();
+      List<ProjectedFieldPoint> points = entry.getValue();
       int count = points.size();
       Translation3d centroid = average(points);
       double distance = robotTranslation.getDistance(centroid.toTranslation2d());
       double score =
           FuelPickupConstants.countWeight * count - FuelPickupConstants.distanceWeight * distance;
-      scores.add(new ClusterScore(clusterId, centroid, count, distance, score));
+      scores.add(new ClusterScore(clusterId, centroid, count, distance, score, false));
     }
     scores.sort(Comparator.comparingDouble(ClusterScore::score).reversed());
+    return scores;
+  }
+
+  private List<ClusterScore> scorePreclusteredClusters(
+      List<DetectionIO.FieldClusterDetection> fieldClusters, Pose2d robotPose) {
+    List<ClusterScore> scores = new ArrayList<>();
+    Translation2d robotTranslation = robotPose.getTranslation();
+    for (DetectionIO.FieldClusterDetection cluster : fieldClusters) {
+      Translation3d centroid =
+          new Translation3d(cluster.xMeters(), cluster.yMeters(), FuelSim.getFuelRadiusMeters());
+      double distance = robotTranslation.getDistance(centroid.toTranslation2d());
+      int count = Math.max(0, (int) Math.round(cluster.count()));
+      double score = cluster.score();
+      if (!Double.isFinite(score)) {
+        score = FuelPickupConstants.countWeight * count - FuelPickupConstants.distanceWeight * distance;
+      }
+      scores.add(new ClusterScore(cluster.clusterId(), centroid, count, distance, score, cluster.best()));
+    }
+    scores.sort(
+        Comparator.comparing(ClusterScore::preferred)
+            .reversed()
+            .thenComparing(Comparator.comparingDouble(ClusterScore::score).reversed()));
     return scores;
   }
 
@@ -255,11 +306,11 @@ public class Detection extends SubsystemBase {
     RobotState.getInstance().setBestFuelCluster(scores.get(0).centroid().toTranslation2d());
   }
 
-  private Translation3d average(List<TrackedFieldPoint> points) {
+  private Translation3d average(List<ProjectedFieldPoint> points) {
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;
-    for (TrackedFieldPoint point : points) {
+    for (ProjectedFieldPoint point : points) {
       x += point.position().getX();
       y += point.position().getY();
       z += point.position().getZ();
@@ -269,21 +320,21 @@ public class Detection extends SubsystemBase {
   }
 
   private DetectionIO.TrackOverlay[] buildTrackOverlays(
-      List<TrackEstimate> tracks, List<TrackedFieldPoint> trackedFieldPoints, int[] clusterLabels) {
-    Map<Integer, Integer> clusterByTrackId = new HashMap<>();
-    for (int i = 0; i < trackedFieldPoints.size(); i++) {
-      clusterByTrackId.put(trackedFieldPoints.get(i).trackId(), clusterLabels[i]);
+      List<ProjectedFieldPoint> projectedFieldPoints, int[] clusterLabels) {
+    Map<Integer, Integer> clusterByPointId = new HashMap<>();
+    for (int i = 0; i < projectedFieldPoints.size(); i++) {
+      clusterByPointId.put(projectedFieldPoints.get(i).pointId(), clusterLabels[i]);
     }
 
-    return tracks.stream()
+    return projectedFieldPoints.stream()
         .map(
-            (track) ->
+            (point) ->
                 new DetectionIO.TrackOverlay(
-                    track.id(),
-                    track.xPx(),
-                    track.yPx(),
-                    track.radiusPx(),
-                    clusterByTrackId.getOrDefault(track.id(), FuelDbscanClusterer.NOISE)))
+                    point.pointId(),
+                    point.xPx(),
+                    point.yPx(),
+                    point.radiusPx(),
+                    clusterByPointId.getOrDefault(point.pointId(), FuelDbscanClusterer.NOISE)))
         .toArray(DetectionIO.TrackOverlay[]::new);
   }
 
@@ -316,36 +367,24 @@ public class Detection extends SubsystemBase {
         detections.stream().mapToDouble(DetectionIO.PixelDetection::bboxHeightPx).toArray());
   }
 
-  private void logTracking(TrackerOutput trackerOutput) {
+  private void logFieldEstimates(List<ProjectedFieldPoint> projectedFieldPoints) {
     Logger.recordOutput(
-        "Detection/Tracking/AllTrackIds",
-        trackerOutput.allTracks().stream().mapToInt(TrackEstimate::id).toArray());
-    Logger.recordOutput(
-        "Detection/Tracking/ConfirmedTrackIds",
-        trackerOutput.confirmedTracks().stream().mapToInt(TrackEstimate::id).toArray());
-    Logger.recordOutput(
-        "Detection/Tracking/AllTrackCentersPx",
-        trackerOutput.allTracks().stream()
-            .map((track) -> new Translation2d(track.xPx(), track.yPx()))
-            .toArray(Translation2d[]::new));
-  }
-
-  private void logFieldEstimates(List<TrackedFieldPoint> trackedFieldPoints) {
-    Logger.recordOutput(
-        "Detection/FieldEstimates/Tracks",
-        trackedFieldPoints.stream().mapToInt(TrackedFieldPoint::trackId).toArray());
+        "Detection/FieldEstimates/PointIds",
+        projectedFieldPoints.stream().mapToInt(ProjectedFieldPoint::pointId).toArray());
     Logger.recordOutput(
         "Detection/FieldEstimates/EstimatedPoses",
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+        projectedFieldPoints.stream()
+            .map(ProjectedFieldPoint::position)
+            .toArray(Translation3d[]::new));
   }
 
   private void logClusters(
       int rawClusterCount,
       int stableClusterCount,
-      List<TrackedFieldPoint> trackedFieldPoints,
+      List<ProjectedFieldPoint> projectedFieldPoints,
       int[] rawTrackClusterLabels,
       int[] stableTrackClusterLabels,
-      Map<Integer, List<TrackedFieldPoint>> stableClusterMap,
+      Map<Integer, List<ProjectedFieldPoint>> stableClusterMap,
       List<ClusterScore> clusterScores,
       int bestClusterId) {
     Logger.recordOutput("Detection/Clusters/RawCount", rawClusterCount);
@@ -356,10 +395,12 @@ public class Detection extends SubsystemBase {
     Logger.recordOutput("Detection/Clusters/TrackClusterIds", stableTrackClusterLabels);
     Logger.recordOutput(
         "Detection/Clusters/FieldPointsUsed",
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+        projectedFieldPoints.stream()
+            .map(ProjectedFieldPoint::position)
+            .toArray(Translation3d[]::new));
     Logger.recordOutput(
-        "Detection/Clusters/TrackIds",
-        trackedFieldPoints.stream().mapToInt(TrackedFieldPoint::trackId).toArray());
+        "Detection/Clusters/PointIds",
+        projectedFieldPoints.stream().mapToInt(ProjectedFieldPoint::pointId).toArray());
     Logger.recordOutput(
         "Detection/Clusters/Centroids",
         clusterScores.stream().map((score) -> score.centroid()).toArray(Translation3d[]::new));
@@ -382,26 +423,10 @@ public class Detection extends SubsystemBase {
     Logger.recordOutput("Detection/Selection/BestClusterCentroid", bestClusterCentroid);
 
     for (int i = 0; i < FuelPickupConstants.maxLoggedClusters; i++) {
-      List<TrackedFieldPoint> points = stableClusterMap.getOrDefault(i, List.of());
+      List<ProjectedFieldPoint> points = stableClusterMap.getOrDefault(i, List.of());
       Logger.recordOutput(
           "Detection/Clusters/Cluster" + i,
-          points.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+          points.stream().map(ProjectedFieldPoint::position).toArray(Translation3d[]::new));
     }
-  }
-
-  private Translation3d filterFieldPoint(int trackId, Translation3d fieldPoint) {
-    Translation3d previous = filteredTrackFieldPoints.get(trackId);
-    if (previous == null) {
-      filteredTrackFieldPoints.put(trackId, fieldPoint);
-      return fieldPoint;
-    }
-    double alpha = clamp(FuelPickupConstants.fieldEstimateEmaAlpha, 0.0, 1.0);
-    Translation3d filtered = previous.times(1.0 - alpha).plus(fieldPoint.times(alpha));
-    filteredTrackFieldPoints.put(trackId, filtered);
-    return filtered;
-  }
-
-  private static double clamp(double value, double min, double max) {
-    return Math.max(min, Math.min(max, value));
   }
 }

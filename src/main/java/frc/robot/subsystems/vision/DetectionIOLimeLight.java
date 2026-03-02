@@ -1,6 +1,10 @@
 package frc.robot.subsystems.vision;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.networktables.DoubleArrayPublisher;
+import edu.wpi.first.networktables.DoubleArraySubscriber;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.subsystems.fuelpickup.FuelPickupConstants;
 import java.util.ArrayList;
@@ -8,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import limelight.Limelight;
 import limelight.networktables.LimelightResults;
 import limelight.networktables.LimelightSettings.LEDMode;
@@ -16,12 +21,19 @@ import limelight.results.RawDetection;
 
 /** Detection IO implementation for a real Limelight using YALL. */
 public class DetectionIOLimeLight implements DetectionIO {
+  private static final int SNAP_PACKET_VERSION = 1;
+  private static final int SNAP_HEADER_SIZE = 3;
+  private static final int SNAP_CLUSTER_STRIDE = 6;
+
   private final String limelightName;
   private final String targetClassName;
+  private final Supplier<Pose2d> robotPoseSupplier;
   private final Limelight limelight;
+  private final DoubleArrayPublisher llrobotPublisher;
+  private final DoubleArraySubscriber llpythonSubscriber;
 
   public DetectionIOLimeLight(String limelightName) {
-    this(limelightName, "");
+    this(limelightName, "", Pose2d::new);
   }
 
   /**
@@ -29,9 +41,23 @@ public class DetectionIOLimeLight implements DetectionIO {
    * @param targetClassName Class to filter on (empty to accept all classes)
    */
   public DetectionIOLimeLight(String limelightName, String targetClassName) {
+    this(limelightName, targetClassName, Pose2d::new);
+  }
+
+  /**
+   * @param limelightName NetworkTables name for the Limelight
+   * @param targetClassName Class to filter on (empty to accept all classes)
+   * @param robotPoseSupplier Supplier for the current robot pose used by SnapScript via llrobot
+   */
+  public DetectionIOLimeLight(
+      String limelightName, String targetClassName, Supplier<Pose2d> robotPoseSupplier) {
     this.limelightName = limelightName;
     this.targetClassName = targetClassName == null ? "" : targetClassName.trim();
+    this.robotPoseSupplier = robotPoseSupplier == null ? Pose2d::new : robotPoseSupplier;
     this.limelight = new Limelight(limelightName);
+    var table = NetworkTableInstance.getDefault().getTable(limelightName);
+    this.llrobotPublisher = table.getDoubleArrayTopic("llrobot").publish();
+    this.llpythonSubscriber = table.getDoubleArrayTopic("llpython").subscribe(new double[] {});
 
     limelight
         .getSettings()
@@ -44,6 +70,8 @@ public class DetectionIOLimeLight implements DetectionIO {
   public void updateInputs(DetectionIOInputs inputs) {
     inputs.timestampSeconds = Timer.getFPGATimestamp();
     inputs.connected = Limelight.isAvailable(limelightName);
+    publishRobotPose(inputs.timestampSeconds);
+    inputs.fieldClusters = parseFieldClusters(llpythonSubscriber.get(), inputs.timestampSeconds);
 
     Map<Integer, String> classNameById = new HashMap<>();
     Map<Integer, Double> confidenceById = new HashMap<>();
@@ -137,6 +165,54 @@ public class DetectionIOLimeLight implements DetectionIO {
     }
 
     inputs.detections = detections.toArray(PixelDetection[]::new);
+  }
+
+  private void publishRobotPose(double timestampSeconds) {
+    Pose2d robotPose = robotPoseSupplier.get();
+    llrobotPublisher.accept(
+        new double[] {
+          robotPose.getX(), robotPose.getY(), robotPose.getRotation().getRadians(), timestampSeconds
+        });
+  }
+
+  private FieldClusterDetection[] parseFieldClusters(
+      double[] packet, double fallbackTimestampSeconds) {
+    if (packet.length < SNAP_HEADER_SIZE) {
+      return new FieldClusterDetection[0];
+    }
+
+    int version = (int) Math.round(packet[0]);
+    if (version != SNAP_PACKET_VERSION) {
+      return new FieldClusterDetection[0];
+    }
+
+    int requestedCount = Math.max(0, (int) Math.round(packet[1]));
+    int availableCount = (packet.length - SNAP_HEADER_SIZE) / SNAP_CLUSTER_STRIDE;
+    int parsedCount = Math.min(requestedCount, availableCount);
+
+    double captureTimestampSeconds = packet[2];
+    if (!Double.isFinite(captureTimestampSeconds)) {
+      captureTimestampSeconds = fallbackTimestampSeconds;
+    }
+
+    List<FieldClusterDetection> clusters = new ArrayList<>(parsedCount);
+    for (int i = 0; i < parsedCount; i++) {
+      int base = SNAP_HEADER_SIZE + i * SNAP_CLUSTER_STRIDE;
+      int clusterId = (int) Math.round(packet[base]);
+      double xMeters = packet[base + 1];
+      double yMeters = packet[base + 2];
+      double count = Math.max(0.0, packet[base + 3]);
+      double score = packet[base + 4];
+      boolean best = packet[base + 5] > 0.5;
+      if (!Double.isFinite(xMeters) || !Double.isFinite(yMeters)) {
+        continue;
+      }
+
+      clusters.add(
+          new FieldClusterDetection(
+              clusterId, xMeters, yMeters, count, score, best, captureTimestampSeconds));
+    }
+    return clusters.toArray(FieldClusterDetection[]::new);
   }
 
   private boolean isClassAllowed(String className) {

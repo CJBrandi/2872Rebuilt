@@ -29,17 +29,8 @@ public final class FuelPickupConstants {
           Units.inchesToMeters(10.004),
           new Rotation3d(0.0, Math.toRadians(25.0), Math.PI));
 
-  public static final double trackerHighConfidence = 0.35;
-  public static final double trackerLowConfidence = 0.15;
-  public static final double trackerMatchDistancePx = 55.0;
-  public static final double trackerSecondPassDistancePx = 70.0;
-  public static final double trackerSpawnSuppressionDistancePx = 20.0;
-  public static final int trackerMinConfirmHits = 2;
-  public static final int trackerMaxMissedFrames = 8;
-
   public static final double dbscanEpsilonMeters = 0.80;
   public static final int dbscanMinPoints = 2;
-  public static final double fieldEstimateEmaAlpha = 0.35;
   public static final double clusterAssociationDistanceMeters = 1.2;
   public static final int clusterMaxMissedFrames = 8;
   public static final double clusterCentroidEmaAlpha = 0.45;

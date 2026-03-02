@@ -7,23 +7,17 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker.Detection;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker.TrackEstimate;
-import frc.robot.subsystems.fuelpickup.FuelBallTracker.TrackerOutput;
 import frc.robot.subsystems.fuelpickup.FuelDbscanClusterer.ClusterResult;
 import frc.robot.util.FuelSim;
 import frc.robot.util.FuelSim.FuelState;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 import org.opencv.core.CvType;
@@ -35,8 +29,7 @@ import org.opencv.imgproc.Imgproc;
 /**
  * End-to-end simulation pipeline for fuel pickup perception.
  *
- * <p>Pipeline: Simulated detections -> tracking -> field projection -> DBSCAN clusters -> cluster
- * scoring.
+ * <p>Pipeline: Simulated detections -> field projection -> DBSCAN clusters -> cluster scoring.
  */
 public class FuelPickupPlanner extends SubsystemBase {
   private static final Scalar BACKGROUND_COLOR = new Scalar(28, 22, 18);
@@ -56,7 +49,10 @@ public class FuelPickupPlanner extends SubsystemBase {
     new Scalar(141, 110, 99)
   };
 
-  private record TrackedFieldPoint(int trackId, Translation3d position, double xPx, double yPx) {}
+  private record SimDetection(double xPx, double yPx, double radiusPx, double confidence) {}
+
+  private record ProjectedFieldPoint(
+      int pointId, Translation3d position, double xPx, double yPx, double radiusPx) {}
 
   private record DetectionSimulationStats(
       int totalFuelCount,
@@ -79,15 +75,6 @@ public class FuelPickupPlanner extends SubsystemBase {
           FuelPickupConstants.frameHeightPx,
           FuelPickupConstants.horizontalFovDeg,
           FuelPickupConstants.verticalFovDeg);
-  private final FuelBallTracker tracker =
-      new FuelBallTracker(
-          FuelPickupConstants.trackerHighConfidence,
-          FuelPickupConstants.trackerLowConfidence,
-          FuelPickupConstants.trackerMatchDistancePx,
-          FuelPickupConstants.trackerSecondPassDistancePx,
-          FuelPickupConstants.trackerSpawnSuppressionDistancePx,
-          FuelPickupConstants.trackerMinConfirmHits,
-          FuelPickupConstants.trackerMaxMissedFrames);
   private final FuelDbscanClusterer clusterer =
       new FuelDbscanClusterer(
           FuelPickupConstants.dbscanEpsilonMeters, FuelPickupConstants.dbscanMinPoints);
@@ -96,7 +83,6 @@ public class FuelPickupPlanner extends SubsystemBase {
           FuelPickupConstants.clusterAssociationDistanceMeters,
           FuelPickupConstants.clusterMaxMissedFrames,
           FuelPickupConstants.clusterCentroidEmaAlpha);
-  private final Map<Integer, Translation3d> filteredTrackFieldPoints = new HashMap<>();
   private final Random random = new Random(2026);
   private DetectionSimulationStats lastDetectionStats =
       new DetectionSimulationStats(0, 0, 0, 0, 0, 0, Double.NaN, Double.NaN);
@@ -131,26 +117,22 @@ public class FuelPickupPlanner extends SubsystemBase {
     FuelState[] fuelStates = fuelSim.getFuelStates();
     Logger.recordOutput("FuelPickup/CameraPose", cameraPose);
 
-    List<Detection> detections = simulateDetections(fuelStates, cameraPose);
+    List<SimDetection> detections = simulateDetections(fuelStates, cameraPose);
     logDetections(detections);
 
-    TrackerOutput trackerOutput = tracker.update(detections, Timer.getFPGATimestamp());
-    logTracking(trackerOutput);
-
-    List<TrackedFieldPoint> trackedFieldPoints =
-        estimateFieldPoints(trackerOutput.confirmedTracks(), cameraPose);
-    logFieldEstimates(trackedFieldPoints);
+    List<ProjectedFieldPoint> projectedFieldPoints = estimateFieldPoints(detections, cameraPose);
+    logFieldEstimates(projectedFieldPoints);
 
     List<Translation3d> estimatedPositions =
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toList();
+        projectedFieldPoints.stream().map(ProjectedFieldPoint::position).toList();
     ClusterResult clusterResult = clusterer.cluster(estimatedPositions);
-    Map<Integer, List<TrackedFieldPoint>> rawClusterMap =
-        buildClusterMap(trackedFieldPoints, clusterResult.labels());
+    Map<Integer, List<ProjectedFieldPoint>> rawClusterMap =
+        buildClusterMap(projectedFieldPoints, clusterResult.labels());
     Map<Integer, Translation3d> rawClusterCentroids = buildClusterCentroids(rawClusterMap);
     Map<Integer, Integer> rawToStableClusterIds = clusterStabilizer.update(rawClusterCentroids);
-    Map<Integer, List<TrackedFieldPoint>> stableClusterMap =
+    Map<Integer, List<ProjectedFieldPoint>> stableClusterMap =
         remapClusterMap(rawClusterMap, rawToStableClusterIds);
-    int[] stableTrackClusterLabels =
+    int[] stablePointClusterLabels =
         remapTrackClusterLabels(clusterResult.labels(), rawToStableClusterIds);
 
     List<ClusterScore> clusterScores = scoreClusters(stableClusterMap, robotPose);
@@ -159,22 +141,17 @@ public class FuelPickupPlanner extends SubsystemBase {
     logClusters(
         clusterResult.clusterCount(),
         stableClusterMap.size(),
-        trackedFieldPoints,
+        projectedFieldPoints,
         clusterResult.labels(),
-        stableTrackClusterLabels,
+        stablePointClusterLabels,
         stableClusterMap,
         clusterScores,
         bestClusterId);
-    renderFrame(
-        detections,
-        trackerOutput.allTracks(),
-        trackedFieldPoints,
-        stableTrackClusterLabels,
-        clusterScores);
+    renderFrame(detections, projectedFieldPoints, stablePointClusterLabels, clusterScores);
   }
 
-  private List<Detection> simulateDetections(FuelState[] fuelStates, Pose3d cameraPose) {
-    List<Detection> detections = new ArrayList<>();
+  private List<SimDetection> simulateDetections(FuelState[] fuelStates, Pose3d cameraPose) {
+    List<SimDetection> detections = new ArrayList<>();
     int projectionRejectedCount = 0;
     int projectedInFrameCount = 0;
     int rangeRejectedCount = 0;
@@ -232,10 +209,10 @@ public class FuelPickupPlanner extends SubsystemBase {
                   + random.nextGaussian() * FuelPickupConstants.confidenceNoiseStdDev,
               0.05,
               0.99);
-      detections.add(new Detection(xPx, yPx, radiusPx, confidence));
+      detections.add(new SimDetection(xPx, yPx, radiusPx, confidence));
     }
 
-    detections.sort(Comparator.comparingDouble(Detection::confidence).reversed());
+    detections.sort(Comparator.comparingDouble(SimDetection::confidence).reversed());
     lastDetectionStats =
         new DetectionSimulationStats(
             fuelStates.length,
@@ -262,15 +239,15 @@ public class FuelPickupPlanner extends SubsystemBase {
                 - FuelPickupConstants.detectionDropRateNear);
   }
 
-  private List<TrackedFieldPoint> estimateFieldPoints(
-      List<TrackEstimate> confirmedTracks, Pose3d cameraPose) {
-    List<TrackedFieldPoint> points = new ArrayList<>();
-    Set<Integer> activeTrackIds = new HashSet<>();
-    for (TrackEstimate track : confirmedTracks) {
+  private List<ProjectedFieldPoint> estimateFieldPoints(
+      List<SimDetection> detections, Pose3d cameraPose) {
+    List<ProjectedFieldPoint> points = new ArrayList<>();
+    for (int i = 0; i < detections.size(); i++) {
+      SimDetection detection = detections.get(i);
       Translation3d fieldPoint =
           cameraModel
               .backProjectToPlane(
-                  track.xPx(), track.yPx(), cameraPose, FuelSim.getFuelRadiusMeters())
+                  detection.xPx(), detection.yPx(), cameraPose, FuelSim.getFuelRadiusMeters())
               .orElse(null);
       if (fieldPoint == null) {
         continue;
@@ -281,41 +258,40 @@ public class FuelPickupPlanner extends SubsystemBase {
           || fieldPoint.getY() > FuelPickupConstants.fieldWidthMeters) {
         continue;
       }
-      activeTrackIds.add(track.id());
-      Translation3d filteredPoint = filterFieldPoint(track.id(), fieldPoint);
-      points.add(new TrackedFieldPoint(track.id(), filteredPoint, track.xPx(), track.yPx()));
+      points.add(
+          new ProjectedFieldPoint(
+              i, fieldPoint, detection.xPx(), detection.yPx(), detection.radiusPx()));
     }
-    filteredTrackFieldPoints.keySet().removeIf((trackId) -> !activeTrackIds.contains(trackId));
     return points;
   }
 
-  private Map<Integer, List<TrackedFieldPoint>> buildClusterMap(
-      List<TrackedFieldPoint> trackedFieldPoints, int[] labels) {
-    Map<Integer, List<TrackedFieldPoint>> clusters = new HashMap<>();
-    for (int i = 0; i < trackedFieldPoints.size(); i++) {
+  private Map<Integer, List<ProjectedFieldPoint>> buildClusterMap(
+      List<ProjectedFieldPoint> projectedFieldPoints, int[] labels) {
+    Map<Integer, List<ProjectedFieldPoint>> clusters = new HashMap<>();
+    for (int i = 0; i < projectedFieldPoints.size(); i++) {
       int label = labels[i];
       if (label < 0) {
         continue;
       }
-      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(trackedFieldPoints.get(i));
+      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(projectedFieldPoints.get(i));
     }
     return clusters;
   }
 
   private Map<Integer, Translation3d> buildClusterCentroids(
-      Map<Integer, List<TrackedFieldPoint>> clusterMap) {
+      Map<Integer, List<ProjectedFieldPoint>> clusterMap) {
     Map<Integer, Translation3d> centroids = new HashMap<>();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : clusterMap.entrySet()) {
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : clusterMap.entrySet()) {
       centroids.put(entry.getKey(), average(entry.getValue()));
     }
     return centroids;
   }
 
-  private Map<Integer, List<TrackedFieldPoint>> remapClusterMap(
-      Map<Integer, List<TrackedFieldPoint>> rawClusterMap,
+  private Map<Integer, List<ProjectedFieldPoint>> remapClusterMap(
+      Map<Integer, List<ProjectedFieldPoint>> rawClusterMap,
       Map<Integer, Integer> rawToStableClusterIds) {
-    Map<Integer, List<TrackedFieldPoint>> stableClusters = new HashMap<>();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : rawClusterMap.entrySet()) {
+    Map<Integer, List<ProjectedFieldPoint>> stableClusters = new HashMap<>();
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : rawClusterMap.entrySet()) {
       Integer stableId = rawToStableClusterIds.get(entry.getKey());
       if (stableId == null) {
         continue;
@@ -341,12 +317,12 @@ public class FuelPickupPlanner extends SubsystemBase {
   }
 
   private List<ClusterScore> scoreClusters(
-      Map<Integer, List<TrackedFieldPoint>> clusterMap, Pose2d robotPose) {
+      Map<Integer, List<ProjectedFieldPoint>> clusterMap, Pose2d robotPose) {
     List<ClusterScore> scores = new ArrayList<>();
     Translation2d robotTranslation = robotPose.getTranslation();
-    for (Map.Entry<Integer, List<TrackedFieldPoint>> entry : clusterMap.entrySet()) {
+    for (Map.Entry<Integer, List<ProjectedFieldPoint>> entry : clusterMap.entrySet()) {
       int clusterId = entry.getKey();
-      List<TrackedFieldPoint> points = entry.getValue();
+      List<ProjectedFieldPoint> points = entry.getValue();
       int count = points.size();
       Translation3d centroid = average(points);
       double distance = robotTranslation.getDistance(centroid.toTranslation2d());
@@ -365,11 +341,11 @@ public class FuelPickupPlanner extends SubsystemBase {
     return scores.get(0).clusterId();
   }
 
-  private Translation3d average(List<TrackedFieldPoint> points) {
+  private Translation3d average(List<ProjectedFieldPoint> points) {
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;
-    for (TrackedFieldPoint point : points) {
+    for (ProjectedFieldPoint point : points) {
       x += point.position().getX();
       y += point.position().getY();
       z += point.position().getZ();
@@ -379,14 +355,13 @@ public class FuelPickupPlanner extends SubsystemBase {
   }
 
   private void renderFrame(
-      List<Detection> detections,
-      List<TrackEstimate> tracks,
-      List<TrackedFieldPoint> trackedFieldPoints,
+      List<SimDetection> detections,
+      List<ProjectedFieldPoint> projectedFieldPoints,
       int[] clusterLabels,
       List<ClusterScore> clusterScores) {
     frameMat.setTo(BACKGROUND_COLOR);
 
-    for (Detection detection : detections) {
+    for (SimDetection detection : detections) {
       Imgproc.circle(
           frameMat,
           new Point(detection.xPx(), detection.yPx()),
@@ -395,22 +370,22 @@ public class FuelPickupPlanner extends SubsystemBase {
           1);
     }
 
-    Map<Integer, Integer> clusterByTrackId = new HashMap<>();
-    for (int i = 0; i < trackedFieldPoints.size(); i++) {
-      clusterByTrackId.put(trackedFieldPoints.get(i).trackId(), clusterLabels[i]);
+    Map<Integer, Integer> clusterByPointId = new HashMap<>();
+    for (int i = 0; i < projectedFieldPoints.size(); i++) {
+      clusterByPointId.put(projectedFieldPoints.get(i).pointId(), clusterLabels[i]);
     }
 
-    for (TrackEstimate track : tracks) {
-      int clusterId = clusterByTrackId.getOrDefault(track.id(), FuelDbscanClusterer.NOISE);
+    for (ProjectedFieldPoint point : projectedFieldPoints) {
+      int clusterId = clusterByPointId.getOrDefault(point.pointId(), FuelDbscanClusterer.NOISE);
       Scalar color =
           clusterId >= 0 ? CLUSTER_COLORS[clusterId % CLUSTER_COLORS.length] : NOISE_COLOR;
-      Point center = new Point(track.xPx(), track.yPx());
+      Point center = new Point(point.xPx(), point.yPx());
 
-      Imgproc.circle(frameMat, center, (int) Math.round(track.radiusPx()), color, 2);
+      Imgproc.circle(frameMat, center, (int) Math.round(point.radiusPx()), color, 2);
       Imgproc.putText(
           frameMat,
-          "T" + track.id(),
-          new Point(track.xPx() + track.radiusPx() + 4.0, track.yPx() - 4.0),
+          "P" + point.pointId(),
+          new Point(point.xPx() + point.radiusPx() + 4.0, point.yPx() - 4.0),
           Imgproc.FONT_HERSHEY_SIMPLEX,
           0.45,
           color,
@@ -435,7 +410,7 @@ public class FuelPickupPlanner extends SubsystemBase {
         1);
     Imgproc.putText(
         frameMat,
-        "Detections: " + detections.size() + "  Tracks: " + tracks.size(),
+        "Detections: " + detections.size() + "  Points: " + projectedFieldPoints.size(),
         new Point(12, 58),
         Imgproc.FONT_HERSHEY_SIMPLEX,
         0.43,
@@ -505,7 +480,7 @@ public class FuelPickupPlanner extends SubsystemBase {
     videoSource.putFrame(frameMat);
   }
 
-  private void logDetections(List<Detection> detections) {
+  private void logDetections(List<SimDetection> detections) {
     Logger.recordOutput("FuelPickup/Detections/Count", detections.size());
     Logger.recordOutput(
         "FuelPickup/Detections/SimInputFuelCount", lastDetectionStats.totalFuelCount());
@@ -533,42 +508,30 @@ public class FuelPickupPlanner extends SubsystemBase {
             .toArray(Translation2d[]::new));
     Logger.recordOutput(
         "FuelPickup/Detections/Confidence",
-        detections.stream().mapToDouble(Detection::confidence).toArray());
+        detections.stream().mapToDouble(SimDetection::confidence).toArray());
     Logger.recordOutput(
         "FuelPickup/Detections/RadiusPx",
-        detections.stream().mapToDouble(Detection::radiusPx).toArray());
+        detections.stream().mapToDouble(SimDetection::radiusPx).toArray());
   }
 
-  private void logTracking(TrackerOutput trackerOutput) {
+  private void logFieldEstimates(List<ProjectedFieldPoint> projectedFieldPoints) {
     Logger.recordOutput(
-        "FuelPickup/Tracking/AllTrackIds",
-        trackerOutput.allTracks().stream().mapToInt(TrackEstimate::id).toArray());
-    Logger.recordOutput(
-        "FuelPickup/Tracking/ConfirmedTrackIds",
-        trackerOutput.confirmedTracks().stream().mapToInt(TrackEstimate::id).toArray());
-    Logger.recordOutput(
-        "FuelPickup/Tracking/AllTrackCentersPx",
-        trackerOutput.allTracks().stream()
-            .map((track) -> new Translation2d(track.xPx(), track.yPx()))
-            .toArray(Translation2d[]::new));
-  }
-
-  private void logFieldEstimates(List<TrackedFieldPoint> trackedFieldPoints) {
-    Logger.recordOutput(
-        "FuelPickup/FieldEstimates/Tracks",
-        trackedFieldPoints.stream().mapToInt(TrackedFieldPoint::trackId).toArray());
+        "FuelPickup/FieldEstimates/PointIds",
+        projectedFieldPoints.stream().mapToInt(ProjectedFieldPoint::pointId).toArray());
     Logger.recordOutput(
         "FuelPickup/FieldEstimates/EstimatedPoses",
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+        projectedFieldPoints.stream()
+            .map(ProjectedFieldPoint::position)
+            .toArray(Translation3d[]::new));
   }
 
   private void logClusters(
       int rawClusterCount,
       int stableClusterCount,
-      List<TrackedFieldPoint> trackedFieldPoints,
+      List<ProjectedFieldPoint> projectedFieldPoints,
       int[] rawTrackClusterLabels,
       int[] stableTrackClusterLabels,
-      Map<Integer, List<TrackedFieldPoint>> stableClusterMap,
+      Map<Integer, List<ProjectedFieldPoint>> stableClusterMap,
       List<ClusterScore> clusterScores,
       int bestClusterId) {
     Logger.recordOutput("FuelPickup/Clusters/RawCount", rawClusterCount);
@@ -579,10 +542,12 @@ public class FuelPickupPlanner extends SubsystemBase {
     Logger.recordOutput("FuelPickup/Clusters/TrackClusterIds", stableTrackClusterLabels);
     Logger.recordOutput(
         "FuelPickup/Clusters/FieldPointsUsed",
-        trackedFieldPoints.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+        projectedFieldPoints.stream()
+            .map(ProjectedFieldPoint::position)
+            .toArray(Translation3d[]::new));
     Logger.recordOutput(
-        "FuelPickup/Clusters/TrackIds",
-        trackedFieldPoints.stream().mapToInt(TrackedFieldPoint::trackId).toArray());
+        "FuelPickup/Clusters/PointIds",
+        projectedFieldPoints.stream().mapToInt(ProjectedFieldPoint::pointId).toArray());
     Logger.recordOutput(
         "FuelPickup/Clusters/Centroids",
         clusterScores.stream().map((score) -> score.centroid()).toArray(Translation3d[]::new));
@@ -605,23 +570,11 @@ public class FuelPickupPlanner extends SubsystemBase {
     Logger.recordOutput("FuelPickup/Selection/BestClusterCentroid", bestClusterCentroid);
 
     for (int i = 0; i < FuelPickupConstants.maxLoggedClusters; i++) {
-      List<TrackedFieldPoint> points = stableClusterMap.getOrDefault(i, List.of());
+      List<ProjectedFieldPoint> points = stableClusterMap.getOrDefault(i, List.of());
       Logger.recordOutput(
           "FuelPickup/Clusters/Cluster" + i,
-          points.stream().map(TrackedFieldPoint::position).toArray(Translation3d[]::new));
+          points.stream().map(ProjectedFieldPoint::position).toArray(Translation3d[]::new));
     }
-  }
-
-  private Translation3d filterFieldPoint(int trackId, Translation3d fieldPoint) {
-    Translation3d previous = filteredTrackFieldPoints.get(trackId);
-    if (previous == null) {
-      filteredTrackFieldPoints.put(trackId, fieldPoint);
-      return fieldPoint;
-    }
-    double alpha = clamp(FuelPickupConstants.fieldEstimateEmaAlpha, 0.0, 1.0);
-    Translation3d filtered = previous.times(1.0 - alpha).plus(fieldPoint.times(alpha));
-    filteredTrackFieldPoints.put(trackId, filtered);
-    return filtered;
   }
 
   private static double clamp(double value, double min, double max) {
