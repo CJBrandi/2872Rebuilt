@@ -346,11 +346,12 @@ public class RobotContainer {
    */
   private void configureButtonBindings() {
     drive.setDefaultCommand(
-        DriveCommands.joystickDrive(
+        DriveCommands.joystickDriveWithSnakeMode(
             drive,
             () -> -controller.getLeftY(),
             () -> -controller.getLeftX(),
-            this::getDriverOmegaInput));
+            this::getDriverOmegaInput,
+            controller.rightBumper()::getAsBoolean));
 
     controller
         .b()
@@ -401,8 +402,6 @@ public class RobotContainer {
 
     // Intake control
     controller.y().whileTrue(new FullAutoFuelPickupCommand(drive, pivot, roller));
-
-    controller.rightBumper().whileTrue(Commands.runEnd(roller::runEject, roller::stop, roller));
   }
 
   private double getDriverOmegaInput() {

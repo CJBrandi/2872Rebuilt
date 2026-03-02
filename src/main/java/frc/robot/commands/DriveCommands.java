@@ -27,6 +27,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -40,6 +41,8 @@ public class DriveCommands {
   private static final double FF_RAMP_RATE = 0.1; // Volts/Sec
   private static final double WHEEL_RADIUS_MAX_VELOCITY = 0.25; // Rad/Sec
   private static final double WHEEL_RADIUS_RAMP_RATE = 0.05; // Rad/Sec^2
+  private static final double SNAKE_MODE_MIN_TRANSLATION = 1e-3;
+  private static final Rotation2d INTAKE_DIRECTION_IN_ROBOT_FRAME = new Rotation2d(Math.PI);
 
   private DriveCommands() {}
 
@@ -94,6 +97,79 @@ public class DriveCommands {
                       : drive.getRotation()));
         },
         drive);
+  }
+
+  /**
+   * Field relative drive command with optional snake mode.
+   *
+   * <p>When snake mode is enabled, the robot heading follows the travel direction so the rear
+   * intake points into motion. When disabled, rotation remains joystick-controlled.
+   */
+  public static Command joystickDriveWithSnakeMode(
+      Drive drive,
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      DoubleSupplier omegaSupplier,
+      BooleanSupplier snakeModeSupplier) {
+    ProfiledPIDController angleController =
+        new ProfiledPIDController(
+            ANGLE_KP,
+            0.0,
+            ANGLE_KD,
+            new TrapezoidProfile.Constraints(ANGLE_MAX_VELOCITY, ANGLE_MAX_ACCELERATION));
+    angleController.enableContinuousInput(-Math.PI, Math.PI);
+
+    Rotation2d[] snakeHeadingTarget = new Rotation2d[] {Rotation2d.kZero};
+
+    return Commands.run(
+            () -> {
+              Translation2d linearVelocity =
+                  getLinearVelocityFromJoysticks(xSupplier.getAsDouble(), ySupplier.getAsDouble());
+              boolean isFlipped =
+                  DriverStation.getAlliance().isPresent()
+                      && DriverStation.getAlliance().get() == Alliance.Red;
+
+              double omega;
+              if (snakeModeSupplier.getAsBoolean()) {
+                if (linearVelocity.getNorm() > SNAKE_MODE_MIN_TRANSLATION) {
+                  Rotation2d travelDirection = linearVelocity.getAngle();
+                  if (isFlipped) {
+                    travelDirection = travelDirection.plus(new Rotation2d(Math.PI));
+                  }
+                  snakeHeadingTarget[0] = travelDirection.minus(INTAKE_DIRECTION_IN_ROBOT_FRAME);
+                }
+
+                omega =
+                    MathUtil.clamp(
+                        angleController.calculate(
+                            drive.getRotation().getRadians(), snakeHeadingTarget[0].getRadians()),
+                        -drive.getMaxAngularSpeedRadPerSec(),
+                        drive.getMaxAngularSpeedRadPerSec());
+              } else {
+                angleController.reset(drive.getRotation().getRadians());
+                omega = MathUtil.applyDeadband(omegaSupplier.getAsDouble(), DEADBAND);
+                omega = Math.copySign(omega * omega, omega) * drive.getMaxAngularSpeedRadPerSec();
+              }
+
+              ChassisSpeeds speeds =
+                  new ChassisSpeeds(
+                      linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
+                      linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
+                      omega);
+              drive.runVelocity(
+                  ChassisSpeeds.fromFieldRelativeSpeeds(
+                      speeds,
+                      isFlipped
+                          ? drive.getRotation().plus(new Rotation2d(Math.PI))
+                          : drive.getRotation()));
+            },
+            drive)
+        .beforeStarting(
+            () -> {
+              Rotation2d currentRotation = drive.getRotation();
+              snakeHeadingTarget[0] = currentRotation;
+              angleController.reset(currentRotation.getRadians());
+            });
   }
 
   /**
