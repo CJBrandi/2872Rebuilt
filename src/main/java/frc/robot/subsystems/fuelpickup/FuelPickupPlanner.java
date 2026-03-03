@@ -273,7 +273,9 @@ public class FuelPickupPlanner extends SubsystemBase {
       if (label < 0) {
         continue;
       }
-      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(projectedFieldPoints.get(i));
+      clusters
+          .computeIfAbsent(label, ignored -> new ArrayList<>())
+          .add(projectedFieldPoints.get(i));
     }
     return clusters;
   }

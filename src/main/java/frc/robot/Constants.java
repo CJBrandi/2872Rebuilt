@@ -18,7 +18,7 @@ import lombok.Getter;
  */
 public final class Constants {
   public static final double loopPeriodSecs = 0.02;
-  public static final Mode simMode = Mode.SIM;
+  public static final Mode simMode = Mode.REAL;
   @Getter public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : simMode;
   public static final boolean tuningMode = true;
   public static boolean disableHAL = false;
@@ -123,6 +123,7 @@ public final class Constants {
 
     public static class IndexerConstants {
       public static final int canId = 54;
+      public static final int vortexId = 55;
       public static final String canBus = "*";
       public static final double reduction = 53;
     }

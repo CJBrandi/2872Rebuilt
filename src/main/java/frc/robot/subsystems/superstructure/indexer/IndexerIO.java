@@ -6,12 +6,13 @@ public interface IndexerIO {
   @AutoLog
   class IndexerIOInputs {
     public boolean motorConnected = true;
+    public boolean followerConnected = true;
     public boolean encoderConnected = true;
 
     public double velocityRadPerSec = 0.0;
-    public double appliedVolts = 0.0;
-    public double currentAmps = 0.0;
-    public double tempCelsius = 0.0;
+    public double[] appliedVolts = new double[] {};
+    public double[] currentAmps = new double[] {};
+    public double[] tempCelsius = new double[] {};
   }
 
   default void updateInputs(IndexerIOInputs inputs) {}

@@ -16,6 +16,8 @@ import frc.robot.Constants;
 public class IndexerIOSim implements IndexerIO {
   private static final double MOI = 0.003;
   private static final double RADIANS_PER_ROTATION = Units.rotationsToRadians(1.0);
+  private static final double AUX_INDEXER_RUN_VOLTS = 6.0;
+  private static final double AUX_INDEXER_RUN_EPSILON = 1e-3;
 
   private static final DCMotor GEARBOX =
       DCMotor.getKrakenX60Foc(1)
@@ -36,6 +38,7 @@ public class IndexerIOSim implements IndexerIO {
   private double kS = 0.0;
   private double kVPerRotationPerSec = 0.0;
   private boolean closedLoop = false;
+  private boolean auxIndexerRunning = false;
 
   public IndexerIOSim() {
     simState = VecBuilder.fill(0.0);
@@ -59,33 +62,39 @@ public class IndexerIOSim implements IndexerIO {
     }
 
     inputs.motorConnected = true;
+    inputs.followerConnected = true;
     inputs.encoderConnected = true;
     inputs.velocityRadPerSec = simState.get(0);
-    inputs.appliedVolts = appliedVolts;
-    inputs.currentAmps = Math.abs(inputTorqueCurrent);
-    inputs.tempCelsius = 0.0;
+    inputs.appliedVolts =
+        new double[] {appliedVolts, auxIndexerRunning ? AUX_INDEXER_RUN_VOLTS : 0.0};
+    inputs.currentAmps = new double[] {Math.abs(inputTorqueCurrent), 0.0};
+    inputs.tempCelsius = new double[] {0.0, 0.0};
   }
 
   @Override
   public void runOpenLoop(double output) {
     closedLoop = false;
+    auxIndexerRunning = Math.abs(output) > AUX_INDEXER_RUN_EPSILON;
     setInputTorqueCurrent(output);
   }
 
   @Override
   public void runVolts(double volts) {
     closedLoop = false;
+    auxIndexerRunning = Math.abs(volts) > AUX_INDEXER_RUN_EPSILON;
     setInputVoltage(volts);
   }
 
   @Override
   public void stop() {
+    auxIndexerRunning = false;
     runOpenLoop(0.0);
   }
 
   @Override
   public void runVelocity(double radsPerSec) {
     closedLoop = true;
+    auxIndexerRunning = Math.abs(radsPerSec) > AUX_INDEXER_RUN_EPSILON;
     controller.setSetpoint(radsPerSec);
   }
 

@@ -92,7 +92,8 @@ public class Detection extends SubsystemBase {
     }
     Logger.recordOutput("Detection/Clusters/Source", "rio_clustered");
 
-    List<ProjectedFieldPoint> projectedFieldPoints = estimateFieldPoints(pixelDetections, cameraPose);
+    List<ProjectedFieldPoint> projectedFieldPoints =
+        estimateFieldPoints(pixelDetections, cameraPose);
     logFieldEstimates(projectedFieldPoints);
 
     List<Translation3d> estimatedPositions =
@@ -208,7 +209,9 @@ public class Detection extends SubsystemBase {
       if (label < 0) {
         continue;
       }
-      clusters.computeIfAbsent(label, ignored -> new ArrayList<>()).add(projectedFieldPoints.get(i));
+      clusters
+          .computeIfAbsent(label, ignored -> new ArrayList<>())
+          .add(projectedFieldPoints.get(i));
     }
     return clusters;
   }
@@ -280,9 +283,11 @@ public class Detection extends SubsystemBase {
       int count = Math.max(0, (int) Math.round(cluster.count()));
       double score = cluster.score();
       if (!Double.isFinite(score)) {
-        score = FuelPickupConstants.countWeight * count - FuelPickupConstants.distanceWeight * distance;
+        score =
+            FuelPickupConstants.countWeight * count - FuelPickupConstants.distanceWeight * distance;
       }
-      scores.add(new ClusterScore(cluster.clusterId(), centroid, count, distance, score, cluster.best()));
+      scores.add(
+          new ClusterScore(cluster.clusterId(), centroid, count, distance, score, cluster.best()));
     }
     scores.sort(
         Comparator.comparing(ClusterScore::preferred)
