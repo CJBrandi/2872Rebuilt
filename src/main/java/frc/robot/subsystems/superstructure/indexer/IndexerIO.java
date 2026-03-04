@@ -10,6 +10,7 @@ public interface IndexerIO {
     public boolean encoderConnected = true;
 
     public double velocityRadPerSec = 0.0;
+    public double auxVelocityRPM = 0.0;
     public double[] appliedVolts = new double[] {};
     public double[] currentAmps = new double[] {};
     public double[] tempCelsius = new double[] {};
@@ -28,6 +29,10 @@ public interface IndexerIO {
   default void setPID(double kP, double kI, double kD) {}
 
   default void setFF(double kS, double kV) {}
+
+  default void setAuxIndexerVelocityRPM(double velocityRPM) {}
+
+  default void setAuxIndexerPIDF(double kP, double kI, double kD, double kF) {}
 
   default void setBrakeMode(boolean enabled) {}
 }

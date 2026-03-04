@@ -39,18 +39,33 @@ public class Indexer {
       new LoggedTunableNumber("Manual/IndexerRPM", 0.0);
   private static final LoggedTunableNumber intakeRPM =
       new LoggedTunableNumber("Superstructure/Indexer/IntakeRPM");
+  private static final LoggedTunableNumber auxIndexerRunVelocityRPM =
+      new LoggedTunableNumber("Superstructure/Indexer/AuxIndexerRunVelocityRPM");
+  private static final LoggedTunableNumber auxIndexerKp =
+      new LoggedTunableNumber("Superstructure/Indexer/AuxIndexer/kP");
+  private static final LoggedTunableNumber auxIndexerKi =
+      new LoggedTunableNumber("Superstructure/Indexer/AuxIndexer/kI");
+  private static final LoggedTunableNumber auxIndexerKd =
+      new LoggedTunableNumber("Superstructure/Indexer/AuxIndexer/kD");
+  private static final LoggedTunableNumber auxIndexerKf =
+      new LoggedTunableNumber("Superstructure/Indexer/AuxIndexer/kF");
 
   static {
     switch (Constants.getCurrentMode()) {
       case REAL -> {
-        kP.initDefault(50);
+        kP.initDefault(80);
         kI.initDefault(0.0);
         kD.initDefault(0.0);
         kS.initDefault(2.85);
-        kV.initDefault(5.0);
+        kV.initDefault(2.5);
         maxVelocityRadPerSec.initDefault(200.0);
         maxAccelerationRadPerSec2.initDefault(400.0);
         staticCharacterizationVelocityThresh.initDefault(0.1);
+        auxIndexerRunVelocityRPM.initDefault(2000);
+        auxIndexerKp.initDefault(0.0001);
+        auxIndexerKi.initDefault(0.0);
+        auxIndexerKd.initDefault(0.0);
+        auxIndexerKf.initDefault(0.00175);
       }
       case SIM, REPLAY -> {
         kP.initDefault(6.0);
@@ -61,6 +76,11 @@ public class Indexer {
         maxVelocityRadPerSec.initDefault(300.0);
         maxAccelerationRadPerSec2.initDefault(600.0);
         staticCharacterizationVelocityThresh.initDefault(0.1);
+        auxIndexerRunVelocityRPM.initDefault(2200.0);
+        auxIndexerKp.initDefault(0.0002);
+        auxIndexerKi.initDefault(0.0);
+        auxIndexerKd.initDefault(0.0);
+        auxIndexerKf.initDefault(0.0);
       }
     }
     intakeRPM.initDefault(20.0);
@@ -115,6 +135,19 @@ public class Indexer {
                         maxVelocityRadPerSec.get(), maxAccelerationRadPerSec2.get())),
         maxVelocityRadPerSec,
         maxAccelerationRadPerSec2);
+    LoggedTunableNumber.ifChanged(
+        hashCode(),
+        () -> io.setAuxIndexerVelocityRPM(auxIndexerRunVelocityRPM.get()),
+        auxIndexerRunVelocityRPM);
+    LoggedTunableNumber.ifChanged(
+        hashCode(),
+        () ->
+            io.setAuxIndexerPIDF(
+                auxIndexerKp.get(), auxIndexerKi.get(), auxIndexerKd.get(), auxIndexerKf.get()),
+        auxIndexerKp,
+        auxIndexerKi,
+        auxIndexerKd,
+        auxIndexerKf);
 
     if (closedLoop) {
       // Move a virtual position target at the desired steady-state velocity and profile towards it.
@@ -141,6 +174,7 @@ public class Indexer {
     Logger.recordOutput(
         "Superstructure/Indexer/MeasuredVelocityRPM",
         Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec));
+    Logger.recordOutput("Superstructure/Indexer/AuxMeasuredVelocityRPM", inputs.auxVelocityRPM);
     Logger.recordOutput("Superstructure/Indexer/AtSetpoint", atSetpoint);
     Logger.recordOutput("Superstructure/Indexer/ClosedLoop", closedLoop);
     Logger.recordOutput(
@@ -148,6 +182,12 @@ public class Indexer {
     Logger.recordOutput("Superstructure/Indexer/ManualMode", manualMode);
     Logger.recordOutput("Superstructure/Indexer/Manual/TargetRPM", manualIndexerRPM.get());
     Logger.recordOutput("Superstructure/Indexer/IntakeTargetRPM", intakeRPM.get());
+    Logger.recordOutput(
+        "Superstructure/Indexer/AuxIndexerTargetRPM", auxIndexerRunVelocityRPM.get());
+    Logger.recordOutput("Superstructure/Indexer/AuxIndexer/kP", auxIndexerKp.get());
+    Logger.recordOutput("Superstructure/Indexer/AuxIndexer/kI", auxIndexerKi.get());
+    Logger.recordOutput("Superstructure/Indexer/AuxIndexer/kD", auxIndexerKd.get());
+    Logger.recordOutput("Superstructure/Indexer/AuxIndexer/kF", auxIndexerKf.get());
   }
 
   /** Runs closed-loop velocity (rad/s). */

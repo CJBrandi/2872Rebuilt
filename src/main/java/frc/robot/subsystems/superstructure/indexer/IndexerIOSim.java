@@ -37,6 +37,7 @@ public class IndexerIOSim implements IndexerIO {
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
   private double kS = 0.0;
   private double kVPerRotationPerSec = 0.0;
+  private double auxIndexerRunVelocityRPM = 2200.0;
   private boolean closedLoop = false;
   private boolean auxIndexerRunning = false;
 
@@ -65,6 +66,7 @@ public class IndexerIOSim implements IndexerIO {
     inputs.followerConnected = true;
     inputs.encoderConnected = true;
     inputs.velocityRadPerSec = simState.get(0);
+    inputs.auxVelocityRPM = auxIndexerRunning ? auxIndexerRunVelocityRPM : 0.0;
     inputs.appliedVolts =
         new double[] {appliedVolts, auxIndexerRunning ? AUX_INDEXER_RUN_VOLTS : 0.0};
     inputs.currentAmps = new double[] {Math.abs(inputTorqueCurrent), 0.0};
@@ -102,6 +104,11 @@ public class IndexerIOSim implements IndexerIO {
   public void setFF(double kS, double kV) {
     this.kS = kS;
     this.kVPerRotationPerSec = kV;
+  }
+
+  @Override
+  public void setAuxIndexerVelocityRPM(double velocityRPM) {
+    auxIndexerRunVelocityRPM = Math.abs(velocityRPM);
   }
 
   @Override

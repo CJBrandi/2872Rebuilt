@@ -17,6 +17,9 @@ import com.revrobotics.PersistMode;
 import com.revrobotics.REVLibError;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.ResetMode;
+import com.revrobotics.spark.FeedbackSensor;
+import com.revrobotics.spark.SparkBase;
+import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel;
 import com.revrobotics.spark.config.SparkBaseConfig;
@@ -34,16 +37,22 @@ import java.util.function.Supplier;
 public class IndexerIOTalonFX implements IndexerIO {
   private static final double REDUCTION =
       Constants.SuperstructureConstants.IndexerConstants.reduction;
-  private static final double AUX_INDEXER_RUN_VOLTS = 4.0;
   private static final double AUX_INDEXER_RUN_EPSILON = 1e-3;
 
   // Hardware
   private final TalonFX talon;
   private final SparkFlex indexer;
+  private final SparkClosedLoopController indexerController;
   private final RelativeEncoder encoder;
+  private double auxIndexerRunVelocityRPM = 2200.0;
+  private double auxIndexerKp = 0.0002;
+  private double auxIndexerKi = 0.0;
+  private double auxIndexerKd = 0.0;
+  private double auxIndexerKf = 0.0;
 
   // Config
   private final TalonFXConfiguration config = new TalonFXConfiguration();
+  private final SparkFlexConfig auxIndexerConfig = new SparkFlexConfig();
 
   // Status signals
   private final StatusSignal<AngularVelocity> velocity;
@@ -94,10 +103,18 @@ public class IndexerIOTalonFX implements IndexerIO {
         new SparkFlex(
             Constants.SuperstructureConstants.IndexerConstants.vortexId,
             SparkLowLevel.MotorType.kBrushless);
+    indexerController = indexer.getClosedLoopController();
     encoder = indexer.getEncoder();
-    SparkFlexConfig indexerConfig = new SparkFlexConfig();
-    indexerConfig.idleMode(SparkBaseConfig.IdleMode.kBrake).inverted(false).smartCurrentLimit(40);
-    indexerConfig
+    auxIndexerConfig
+        .idleMode(SparkBaseConfig.IdleMode.kBrake)
+        .inverted(false)
+        .smartCurrentLimit(40);
+    auxIndexerConfig
+        .closedLoop
+        .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+        .outputRange(-1.0, 1.0);
+    applyAuxIndexerPIDFToConfig();
+    auxIndexerConfig
         .signals
         .primaryEncoderPositionAlwaysOn(true)
         .primaryEncoderPositionPeriodMs(20)
@@ -111,7 +128,7 @@ public class IndexerIOTalonFX implements IndexerIO {
         5,
         () ->
             indexer.configure(
-                indexerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
+                auxIndexerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
     tryUntilOkRev(5, () -> encoder.setPosition(0.0));
   }
 
@@ -129,6 +146,8 @@ public class IndexerIOTalonFX implements IndexerIO {
     double auxAppliedOutput = indexer.getAppliedOutput();
     REVLibError auxAppliedOutputError = indexer.getLastError();
     double auxAppliedVolts = auxBusVolts * auxAppliedOutput;
+    double auxVelocityRPM = encoder.getVelocity();
+    REVLibError auxVelocityError = indexer.getLastError();
     double auxCurrentAmps = indexer.getOutputCurrent();
     REVLibError auxCurrentError = indexer.getLastError();
     double auxTempCelsius = indexer.getMotorTemperature();
@@ -136,6 +155,7 @@ public class IndexerIOTalonFX implements IndexerIO {
     boolean auxConnected =
         auxBusVoltsError == REVLibError.kOk
             && auxAppliedOutputError == REVLibError.kOk
+            && auxVelocityError == REVLibError.kOk
             && auxCurrentError == REVLibError.kOk
             && auxTempError == REVLibError.kOk;
 
@@ -143,6 +163,7 @@ public class IndexerIOTalonFX implements IndexerIO {
     inputs.followerConnected = followerConnectedDebouncer.calculate(auxConnected);
     inputs.encoderConnected = encoderConnectedDebouncer.calculate(talonConnected);
     inputs.velocityRadPerSec = Units.rotationsToRadians(velocity.getValueAsDouble());
+    inputs.auxVelocityRPM = auxVelocityRPM;
     inputs.appliedVolts = new double[] {leaderAppliedVolts, auxAppliedVolts};
     inputs.currentAmps = new double[] {leaderCurrentAmps, auxCurrentAmps};
     inputs.tempCelsius = new double[] {leaderTempCelsius, auxTempCelsius};
@@ -189,6 +210,27 @@ public class IndexerIOTalonFX implements IndexerIO {
   }
 
   @Override
+  public void setAuxIndexerVelocityRPM(double velocityRPM) {
+    auxIndexerRunVelocityRPM = Math.abs(velocityRPM);
+  }
+
+  @Override
+  public void setAuxIndexerPIDF(double kP, double kI, double kD, double kF) {
+    auxIndexerKp = kP;
+    auxIndexerKi = kI;
+    auxIndexerKd = kD;
+    auxIndexerKf = kF;
+    applyAuxIndexerPIDFToConfig();
+    tryUntilOkRev(
+        5,
+        () ->
+            indexer.configure(
+                auxIndexerConfig,
+                ResetMode.kNoResetSafeParameters,
+                PersistMode.kNoPersistParameters));
+  }
+
+  @Override
   public void setBrakeMode(boolean enabled) {
     new Thread(
             () -> talon.setNeutralMode(enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast))
@@ -196,7 +238,13 @@ public class IndexerIOTalonFX implements IndexerIO {
   }
 
   private void runAuxIndexer(boolean talonRunning) {
-    indexer.setVoltage(talonRunning ? AUX_INDEXER_RUN_VOLTS : 0.0);
+    indexerController.setSetpoint(
+        talonRunning ? auxIndexerRunVelocityRPM : 0.0, SparkBase.ControlType.kVelocity);
+  }
+
+  private void applyAuxIndexerPIDFToConfig() {
+    auxIndexerConfig.closedLoop.pid(auxIndexerKp, auxIndexerKi, auxIndexerKd);
+    auxIndexerConfig.closedLoop.feedForward.kV(auxIndexerKf);
   }
 
   private static void tryUntilOkRev(int maxAttempts, Supplier<REVLibError> command) {
