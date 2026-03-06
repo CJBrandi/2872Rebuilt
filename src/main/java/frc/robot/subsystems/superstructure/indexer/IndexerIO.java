@@ -11,9 +11,9 @@ public interface IndexerIO {
 
     public double velocityRadPerSec = 0.0;
     public double auxVelocityRPM = 0.0;
-    public double[] appliedVolts = new double[] {};
-    public double[] currentAmps = new double[] {};
-    public double[] tempCelsius = new double[] {};
+    public double appliedVolts = 0.0;
+    public double currentAmps = 0.0;
+    public double tempCelsius = 0.0;
   }
 
   default void updateInputs(IndexerIOInputs inputs) {}

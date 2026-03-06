@@ -27,25 +27,18 @@ public class Turret {
       new LoggedTunableNumber("Turret/MaxVelocityDegreesPerSec");
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
       new LoggedTunableNumber("Turret/MaxAccelerationDegreesPerSec2");
-  private static final LoggedTunableNumber homingVolts =
-      new LoggedTunableNumber("Turret/HomingVolts");
-  private static final LoggedTunableNumber hallBandWidthDeg =
-      new LoggedTunableNumber("Turret/HallBandWidthDeg");
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Turret/StaticCharacterizationVelocityThreshRadPerSec");
-  private static final LoggedTunableNumber minLimitDegrees =
-      new LoggedTunableNumber("Turret/MinLimitDegrees");
-  private static final LoggedTunableNumber maxLimitDegrees =
-      new LoggedTunableNumber("Turret/MaxLimitDegrees");
-  private static final double STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS = 10.0;
+  private static final LoggedTunableNumber extraLimitDegrees =
+      new LoggedTunableNumber("Turret/ExtraLimitDegrees");
+
+  private static final double BASE_LIMIT_DEGREES = 180.0;
 
   // Manual mode tunables
   private static final LoggedTunableNumber manualModeEnabled =
       new LoggedTunableNumber("Manual/Enabled");
   private static final LoggedTunableNumber manualAngleDeg =
       new LoggedTunableNumber("Manual/YawDeg");
-  private static final LoggedTunableNumber disableHoming =
-      new LoggedTunableNumber("Turret/DisableHoming");
 
   static {
     switch (Constants.getCurrentMode()) {
@@ -66,12 +59,8 @@ public class Turret {
         maxAccelerationDegPerSec2.initDefault(18000);
       }
     }
-    homingVolts.initDefault(0.2);
-    hallBandWidthDeg.initDefault(36.5);
     staticCharacterizationVelocityThresh.initDefault(0.1);
-    minLimitDegrees.initDefault(-185.0);
-    maxLimitDegrees.initDefault(185.0);
-    disableHoming.initDefault(1.0);
+    extraLimitDegrees.initDefault(5.0);
     manualModeEnabled.initDefault(0.0);
     manualAngleDeg.initDefault(0.0);
   }
@@ -91,11 +80,6 @@ public class Turret {
 
   // Tracks last commanded goal to pick shortest legal path
   private double lastGoalAngle = 0.0;
-
-  @Getter private boolean homed = false;
-
-  @AutoLogOutput(key = "Turret/HomedPositionRad")
-  private double homedPosition = 0.0;
 
   @AutoLogOutput(key = "Turret/StaticCharacterizationActive")
   private boolean staticCharacterizationActive = false;
@@ -160,16 +144,13 @@ public class Turret {
             new RobotState.TurretObservation(
                 Timer.getFPGATimestamp(), inputs.motorEncoderPosition));
 
+    boolean manualMode = manualModeEnabled.get() > 0.5;
     // Manual mode - use tunable angle as target
-    if (manualModeEnabled.get() > 0.5 && !staticCharacterizationActive) {
+    if (manualMode && !staticCharacterizationActive) {
       setTargetTurretAngle(Rotation2d.fromDegrees(manualAngleDeg.get()));
     }
 
-    // Run closed loop control if enabled, homed, and we have a target
-    // Manual mode disables automatic field-relative calculations
-    boolean manualMode = manualModeEnabled.get() > 0.5;
     if (closedLoop
-        && homed
         && !staticCharacterizationActive
         && targetFieldRelativeAngle != null
         && !manualMode) {
@@ -202,7 +183,7 @@ public class Turret {
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", robotRelativeGoalVelocity);
-    } else if (closedLoop && homed && !staticCharacterizationActive && targetTurretAngle != null) {
+    } else if (closedLoop && !staticCharacterizationActive && targetTurretAngle != null) {
       // Direct turret angle control (no field-relative conversion)
       double bestAngle = findBestAngleWithinLimits(targetTurretAngle.getRadians());
       lastGoalAngle = bestAngle;
@@ -215,7 +196,7 @@ public class Turret {
 
       turretIO.runPosition(Rotation2d.fromRadians(setpoint.position), feedforward);
 
-      atGoal = EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(2.0));
+      atGoal = EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(5.0));
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", targetVelocityRadPerSec);
@@ -223,27 +204,23 @@ public class Turret {
       atGoal = false;
     }
 
-    Logger.recordOutput("Turret/Homed", homed);
-
     logState();
     TurretVisualizer.update(setpoint.position);
   }
 
-  /** Finds the best turret angle among equivalent wraps while enforcing software min/max limits. */
   private double findBestAngleWithinLimits(double robotRelativeGoalRad) {
     double requestedDeg = Units.radiansToDegrees(robotRelativeGoalRad);
     double principalDeg = MathUtil.inputModulus(requestedDeg, -180.0, 180.0);
     double referenceDeg = Units.radiansToDegrees(lastGoalAngle);
-    double minDeg = getMinLimitDeg();
-    double maxDeg = getMaxLimitDeg();
+    double maxAbsDeg = getMaxAbsAngleDeg();
 
     double bestDeg = Double.NaN;
     double bestDistance = Double.POSITIVE_INFINITY;
 
-    // Check equivalent wraps and keep only legal candidates inside [minDeg, maxDeg]
+    // Check equivalent wraps and keep only legal candidates inside +/- maxAbsDeg
     for (int i = -2; i <= 2; i++) {
       double candidateDeg = principalDeg + 360.0 * i;
-      if (candidateDeg >= minDeg && candidateDeg <= maxDeg) {
+      if (Math.abs(candidateDeg) <= maxAbsDeg) {
         double distance = Math.abs(candidateDeg - referenceDeg);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -255,7 +232,7 @@ public class Turret {
     boolean usedFallbackClamp = false;
     if (Double.isNaN(bestDeg)) {
       // Should be rare for this mechanism; keep command legal even in edge cases
-      bestDeg = MathUtil.clamp(principalDeg, minDeg, maxDeg);
+      bestDeg = MathUtil.clamp(principalDeg, -maxAbsDeg, maxAbsDeg);
       usedFallbackClamp = true;
     }
 
@@ -263,8 +240,7 @@ public class Turret {
     Logger.recordOutput("Turret/Safety/PrincipalAngleDeg", principalDeg);
     Logger.recordOutput("Turret/Safety/ReferenceAngleDeg", referenceDeg);
     Logger.recordOutput("Turret/Safety/SelectedAngleDeg", bestDeg);
-    Logger.recordOutput("Turret/Safety/MinLimitDeg", minDeg);
-    Logger.recordOutput("Turret/Safety/MaxLimitDeg", maxDeg);
+    Logger.recordOutput("Turret/Safety/MaxAbsAngleDeg", maxAbsDeg);
     Logger.recordOutput("Turret/Safety/FallbackClampUsed", usedFallbackClamp);
 
     return Units.degreesToRadians(bestDeg);
@@ -281,27 +257,19 @@ public class Turret {
 
     double velocity = state.velocity;
     // If clamped at a hard limit and velocity is pushing farther out, zero velocity.
-    double minRad = Units.degreesToRadians(getMinLimitDeg());
-    double maxRad = Units.degreesToRadians(getMaxLimitDeg());
-    if ((Math.abs(clampedPosition - minRad) < 1e-9 && velocity < 0.0)
-        || (Math.abs(clampedPosition - maxRad) < 1e-9 && velocity > 0.0)) {
+    if (Math.signum(clampedPosition) == Math.signum(velocity)) {
       velocity = 0.0;
     }
     return new TrapezoidProfile.State(clampedPosition, velocity);
   }
 
-  private double getMinLimitDeg() {
-    return Math.min(minLimitDegrees.get(), maxLimitDegrees.get());
-  }
-
-  private double getMaxLimitDeg() {
-    return Math.max(minLimitDegrees.get(), maxLimitDegrees.get());
+  private double getMaxAbsAngleDeg() {
+    return BASE_LIMIT_DEGREES + Math.max(0.0, extraLimitDegrees.get());
   }
 
   private double clampToLimitsRad(double angleRad) {
-    double minRad = Units.degreesToRadians(getMinLimitDeg());
-    double maxRad = Units.degreesToRadians(getMaxLimitDeg());
-    return MathUtil.clamp(angleRad, minRad, maxRad);
+    double maxAbsRad = Units.degreesToRadians(getMaxAbsAngleDeg());
+    return MathUtil.clamp(angleRad, -maxAbsRad, maxAbsRad);
   }
 
   private void logState() {
@@ -322,8 +290,7 @@ public class Turret {
     Logger.recordOutput("Turret/ActualVelocityRadPerSec", inputs.velocityRadPerSec);
     Logger.recordOutput("Turret/FieldRelativeAngleDeg", getFieldRelativeAngle().getDegrees());
     Logger.recordOutput("Turret/LastGoalAngleDeg", Units.radiansToDegrees(lastGoalAngle));
-    Logger.recordOutput("Turret/Safety/MinLimitDeg", getMinLimitDeg());
-    Logger.recordOutput("Turret/Safety/MaxLimitDeg", getMaxLimitDeg());
+    Logger.recordOutput("Turret/Safety/ExtraLimitDeg", Math.max(0.0, extraLimitDegrees.get()));
   }
 
   /**
@@ -415,133 +382,9 @@ public class Turret {
     Logger.recordOutput("Turret/Safety/ResetAppliedDeg", safeDegrees);
   }
 
-  private double getHallCenterDegForIndex(int sensorIndex) {
-    return switch (sensorIndex) {
-      case 0 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall;
-      case 1 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.middleHall;
-      case 2 -> Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall;
-      default -> 0.0;
-    };
-  }
-
-  private void resetHallEdgeCapture(HallEdgeCaptureState captureState) {
-    System.arraycopy(
-        inputs.hallEffectState,
-        0,
-        captureState.previousTriggered,
-        0,
-        inputs.hallEffectState.length);
-    captureState.edgeSensorIndex = -1;
-    captureState.enteredBand = false;
-    captureState.edgeAngleDeg = Double.NaN;
-    captureState.inferredCenterDeg = Double.NaN;
-    captureState.inferredPositionDeg = Double.NaN;
-  }
-
   /** Returns whether the motor is connected. */
   public boolean isMotorConnected() {
     return motorConnectedDebouncer.calculate(inputs.motorConnected);
-  }
-
-  private static class HallEdgeCaptureState {
-    boolean[] previousTriggered = new boolean[3];
-    int edgeSensorIndex = -1;
-    boolean enteredBand = false;
-    double edgeAngleDeg = Double.NaN;
-    double inferredCenterDeg = Double.NaN;
-    double inferredPositionDeg = Double.NaN;
-  }
-
-  public Command homingSequence() {
-    if (disableHoming.get() > 0.5) {
-      return Commands.runOnce(
-          () -> {
-            homed = true;
-            Logger.recordOutput("Turret/Homing/Disabled", true);
-          });
-    }
-
-    final HallEdgeCaptureState captureState = new HallEdgeCaptureState();
-    return Commands.startRun(
-            () -> {
-              closedLoop = false;
-              homed = false;
-              homedPosition = 0.0;
-              Logger.recordOutput("Turret/Homing/Disabled", false);
-              resetHallEdgeCapture(captureState);
-            },
-            () -> {
-              turretIO.runVolts(homingVolts.get());
-
-              double currentAngleDeg = inputs.motorEncoderPosition.getDegrees();
-
-              double motionSign = Math.signum(homingVolts.get());
-              if (motionSign == 0.0) {
-                motionSign = 1.0;
-              }
-
-              double halfBandWidthDeg = 0.5 * Math.abs(hallBandWidthDeg.get());
-              for (int i = 0; i < inputs.hallEffectState.length; i++) {
-                boolean wasTriggered = captureState.previousTriggered[i];
-                boolean nowTriggered = inputs.hallEffectState[i];
-                if (wasTriggered == nowTriggered) {
-                  continue;
-                }
-
-                boolean enteredBand = !wasTriggered && nowTriggered;
-                double boundaryOffsetSign;
-                if (motionSign > 0.0) {
-                  boundaryOffsetSign = enteredBand ? -1.0 : 1.0;
-                } else {
-                  boundaryOffsetSign = enteredBand ? 1.0 : -1.0;
-                }
-
-                double inferredCenterDeg = getHallCenterDegForIndex(i);
-                double inferredPositionDeg =
-                    inferredCenterDeg + boundaryOffsetSign * halfBandWidthDeg;
-
-                captureState.edgeSensorIndex = i;
-                captureState.enteredBand = enteredBand;
-                captureState.edgeAngleDeg = currentAngleDeg;
-                captureState.inferredCenterDeg = inferredCenterDeg;
-                captureState.inferredPositionDeg = inferredPositionDeg;
-
-                homedPosition = inferredPositionDeg;
-                homed = true;
-                break;
-              }
-
-              System.arraycopy(
-                  inputs.hallEffectState,
-                  0,
-                  captureState.previousTriggered,
-                  0,
-                  inputs.hallEffectState.length);
-
-              Logger.recordOutput("Turret/Homing/TrackedSensorIndex", captureState.edgeSensorIndex);
-              Logger.recordOutput("Turret/Homing/WaitingForClear", false);
-              Logger.recordOutput("Turret/Homing/CommandVolts", homingVolts.get());
-              Logger.recordOutput(
-                  "Turret/Homing/EntryEdgeDeg",
-                  captureState.enteredBand ? captureState.edgeAngleDeg : Double.NaN);
-              Logger.recordOutput(
-                  "Turret/Homing/ExitEdgeDeg",
-                  captureState.enteredBand ? Double.NaN : captureState.edgeAngleDeg);
-              Logger.recordOutput(
-                  "Turret/Homing/MeasuredCenterDeg", captureState.inferredCenterDeg);
-              Logger.recordOutput("Turret/Homing/EnteredBandEdge", captureState.enteredBand);
-              Logger.recordOutput("Turret/Homing/CalculatedPositionDeg", homedPosition);
-            })
-        .until(() -> homed)
-        .andThen(
-            () -> {
-              turretIO.stop();
-              resetPosition(homedPosition);
-            })
-        .finallyDo(
-            () -> {
-              closedLoop = true;
-            });
   }
 
   /** State class for static characterization. */
@@ -567,11 +410,7 @@ public class Turret {
             () -> {
               // Keep closed-loop off even if other code paths set targets while characterizing.
               closedLoop = false;
-              state.characterizationCurrentAmps =
-                  MathUtil.clamp(
-                      currentRampRateAmpsPerSec * timer.get(),
-                      -STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS,
-                      STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS);
+              state.characterizationCurrentAmps = currentRampRateAmpsPerSec * timer.get();
               System.out.println("Turret Current Ramp: " + state.characterizationCurrentAmps);
               turretIO.runCurrent(state.characterizationCurrentAmps);
               Logger.recordOutput(

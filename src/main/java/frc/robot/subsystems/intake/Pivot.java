@@ -32,7 +32,6 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Pivot extends SubsystemBase {
-  // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Intake/Pivot/kP");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Intake/Pivot/kD");
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Intake/Pivot/kS");
@@ -81,9 +80,6 @@ public class Pivot extends SubsystemBase {
   private BooleanSupplier coastOverride = () -> false;
   private BooleanSupplier disabledOverride = () -> false;
 
-  @AutoLogOutput(key = "Intake/Pivot/BrakeModeEnabled")
-  private boolean brakeModeEnabled = true;
-
   // Control
   @Getter
   @AutoLogOutput(key = "Intake/Pivot/MeasuredAngle")
@@ -104,8 +100,6 @@ public class Pivot extends SubsystemBase {
   // Homed state is explicit and can be controlled directly.
   @Getter @Setter private boolean homed = false;
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
-  private boolean manualOverrideActive = false;
-  private boolean wasManualModeEnabled = false;
 
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
@@ -122,7 +116,6 @@ public class Pivot extends SubsystemBase {
                 Units.degreesToRadians(maxVelocityDegPerSec.get()),
                 Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
 
-    // Sim/replay default to homed.
     if (Constants.getCurrentMode() != Mode.REAL) {
       homed = true;
     }
@@ -161,14 +154,7 @@ public class Pivot extends SubsystemBase {
     }
 
     // Run profile
-    boolean manualModeEnabledNow = manualModeEnabled.get() > 0.5;
-    if (!manualModeEnabledNow) {
-      manualOverrideActive = false;
-    } else if (!wasManualModeEnabled || manualPivotAngleDeg.hasChanged(hashCode())) {
-      manualOverrideActive = false;
-    }
-    boolean manualMode = manualModeEnabledNow && !manualOverrideActive;
-    wasManualModeEnabled = manualModeEnabledNow;
+    boolean manualMode = manualModeEnabled.get() > 0.5;
 
     final boolean shouldRunProfile =
         !stopProfile
@@ -206,9 +192,7 @@ public class Pivot extends SubsystemBase {
           kS.get() * Math.signum(setpoint.velocity) + kG.get() * angle.getCos());
 
       // Check at goal
-      atGoal =
-          EqualsUtil.epsilonEquals(setpoint.position, goalState.position)
-              && EqualsUtil.epsilonEquals(setpoint.velocity, goalState.velocity);
+      atGoal = EqualsUtil.epsilonEquals(setpoint.position, goalState.position);
 
       // Log state
       Logger.recordOutput("Intake/Pivot/Profile/SetpointPositionRad", setpoint.position);
@@ -221,7 +205,6 @@ public class Pivot extends SubsystemBase {
       Logger.recordOutput("Intake/Pivot/Profile/GoalVelocityRadPerSec", goalState.velocity);
       Logger.recordOutput(
           "Intake/Pivot/Profile/GoalVelocityDegPerSec", Math.toDegrees(goalState.velocity));
-      Logger.recordOutput("Intake/Pivot/Homed", homed);
     } else {
       // Reset setpoint
       setpoint = new State(angle.getRadians(), 0.0);
@@ -240,13 +223,12 @@ public class Pivot extends SubsystemBase {
     Logger.recordOutput("Intake/Pivot/CoastOverride", coastOverride.getAsBoolean());
     Logger.recordOutput("Intake/Pivot/DisabledOverride", disabledOverride.getAsBoolean());
     Logger.recordOutput("Intake/Pivot/ManualMode", manualMode);
-    Logger.recordOutput("Intake/Pivot/ManualModeEnabled", manualModeEnabledNow);
-    Logger.recordOutput("Intake/Pivot/ManualOverrideActive", manualOverrideActive);
     Logger.recordOutput("Intake/Pivot/Manual/TargetAngleDeg", manualPivotAngleDeg.get());
     Logger.recordOutput("Intake/Pivot/MeasuredPositionDeg", angle.getDegrees());
     Logger.recordOutput("Intake/Pivot/MeasuredVelocityRadPerSec", inputs.velocityRadPerSec);
     Logger.recordOutput(
         "Intake/Pivot/MeasuredVelocityDegPerSec", Math.toDegrees(inputs.velocityRadPerSec));
+    Logger.recordOutput("Intake/Pivot/Homed", homed);
   }
 
   public void setGoal(Supplier<Rotation2d> goal) {
@@ -255,17 +237,6 @@ public class Pivot extends SubsystemBase {
 
   public void setGoal(DoubleSupplier goal) {
     atGoal = false;
-    manualOverrideActive = false;
-    this.goal = goal;
-  }
-
-  public void setGoalOverrideManual(Supplier<Rotation2d> goal) {
-    setGoalOverrideManual(() -> goal.get().getRadians());
-  }
-
-  public void setGoalOverrideManual(DoubleSupplier goal) {
-    atGoal = false;
-    manualOverrideActive = true;
     this.goal = goal;
   }
 
@@ -273,14 +244,7 @@ public class Pivot extends SubsystemBase {
     return goal.getAsDouble();
   }
 
-  public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
-    this.coastOverride = coastOverride;
-    this.disabledOverride = disabledOverride;
-  }
-
   private void setBrakeMode(boolean enabled) {
-    if (brakeModeEnabled == enabled) return;
-    brakeModeEnabled = enabled;
     io.setBrakeMode(enabled);
   }
 
@@ -300,7 +264,6 @@ public class Pivot extends SubsystemBase {
     io.setPosition(degrees);
   }
 
-  /** Home the fourbar to stowed position (90 degrees) */
   public void homeToStowed() {
     io.homeToStowed();
   }
@@ -309,17 +272,11 @@ public class Pivot extends SubsystemBase {
     return inputs.velocityRadPerSec;
   }
 
-  /**
-   * Creates a command for homing the pivot by running into the stowed hard stop.
-   *
-   * @return Command that runs the homing sequence
-   */
   public Command homingSequence() {
     return Commands.startRun(
             () -> {
               stopProfile = true;
               homed = false;
-              manualOverrideActive = false;
               homingDebouncer = new Debouncer(homingTimeSecs.get());
               homingDebouncer.calculate(false);
             },

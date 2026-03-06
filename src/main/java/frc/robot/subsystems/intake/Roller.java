@@ -79,9 +79,6 @@ public class Roller extends SubsystemBase {
   @Getter private double targetVelocityRPS = 0.0;
   @Getter private boolean atSetpoint = false;
   private boolean closedLoop = false;
-  private boolean manualOverrideActive = false;
-  private boolean wasManualMode = false;
-
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
       new Alert("Intake roller motor disconnected!", Alert.AlertType.kWarning);
@@ -95,19 +92,7 @@ public class Roller extends SubsystemBase {
     io.updateInputs(inputs);
     Logger.processInputs("Intake/Roller", inputs);
 
-    boolean manualModeEnabledNow = manualModeEnabled.get() > 0.5;
-    if (!manualModeEnabledNow) {
-      manualOverrideActive = false;
-    } else if (!wasManualMode || manualRollerRPM.hasChanged(hashCode())) {
-      manualOverrideActive = false;
-    }
-    boolean manualMode = manualModeEnabledNow && !manualOverrideActive;
-    if (manualMode) {
-      runVelocityRPM(manualRollerRPM.get());
-    } else if (!manualModeEnabledNow && wasManualMode) {
-      stop();
-    }
-    wasManualMode = manualModeEnabledNow;
+    boolean manualMode = manualModeEnabled.get() > 0.5;
 
     LoggedTunableNumber.ifChanged(
         hashCode(),
@@ -155,9 +140,7 @@ public class Roller extends SubsystemBase {
     Logger.recordOutput("Intake/Roller/TargetVelocityRPM", targetVelocityRPS * 60.0);
     Logger.recordOutput(
         "Intake/Roller/SetpointVelocityRPM", closedLoop ? setpoint.velocity * 60.0 : 0.0);
-    Logger.recordOutput("Intake/Roller/ManualMode", manualMode);
-    Logger.recordOutput("Intake/Roller/ManualModeEnabled", manualModeEnabledNow);
-    Logger.recordOutput("Intake/Roller/ManualOverrideActive", manualOverrideActive);
+    Logger.recordOutput("Intake/Roller/ManualModeEnabled", manualMode);
     Logger.recordOutput("Intake/Roller/Manual/TargetRPM", manualRollerRPM.get());
 
     if (closedLoop) {
@@ -194,21 +177,9 @@ public class Roller extends SubsystemBase {
     runVelocity(intakeVelocity.get());
   }
 
-  /** Run roller at intake velocity and override manual mode output. */
-  public void runIntakeOverrideManual() {
-    manualOverrideActive = true;
-    runIntake();
-  }
-
   /** Run roller at velocity (rotations per minute) using torque current control */
   public void runVelocityRPM(double velocityRPM) {
     runVelocity(velocityRPM / 60.0);
-  }
-
-  /** Run roller at velocity and override manual mode output. */
-  public void runVelocityOverrideManual(double velocityRPS) {
-    manualOverrideActive = true;
-    runVelocity(velocityRPS);
   }
 
   /** Run roller at eject velocity */
@@ -241,13 +212,6 @@ public class Roller extends SubsystemBase {
     targetVelocityRPS = 0.0;
     io.stop();
   }
-
-  /** Stop roller and hold that stop even when manual mode is enabled. */
-  public void stopOverrideManual() {
-    manualOverrideActive = true;
-    stop();
-  }
-
   /** Set brake mode */
   public void setBrakeMode(boolean enabled) {
     io.setBrakeMode(enabled);

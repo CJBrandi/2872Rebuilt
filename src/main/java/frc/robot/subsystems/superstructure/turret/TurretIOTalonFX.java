@@ -95,7 +95,7 @@ public class TurretIOTalonFX implements TurretIO {
         250.0, position, velocity, appliedVolts, current, temperature);
     talon.optimizeBusUtilization();
 
-    talon.setPosition(Units.degreesToRotations(-90));
+    talon.setPosition(Units.degreesToRotations(-180));
   }
 
   @Override

@@ -16,8 +16,6 @@ import frc.robot.Constants;
 public class IndexerIOSim implements IndexerIO {
   private static final double MOI = 0.003;
   private static final double RADIANS_PER_ROTATION = Units.rotationsToRadians(1.0);
-  private static final double AUX_INDEXER_RUN_VOLTS = 6.0;
-  private static final double AUX_INDEXER_RUN_EPSILON = 1e-3;
 
   private static final DCMotor GEARBOX =
       DCMotor.getKrakenX60Foc(1)
@@ -37,9 +35,7 @@ public class IndexerIOSim implements IndexerIO {
   private final PIDController controller = new PIDController(0.0, 0.0, 0.0);
   private double kS = 0.0;
   private double kVPerRotationPerSec = 0.0;
-  private double auxIndexerRunVelocityRPM = 2200.0;
   private boolean closedLoop = false;
-  private boolean auxIndexerRunning = false;
 
   public IndexerIOSim() {
     simState = VecBuilder.fill(0.0);
@@ -66,37 +62,31 @@ public class IndexerIOSim implements IndexerIO {
     inputs.followerConnected = true;
     inputs.encoderConnected = true;
     inputs.velocityRadPerSec = simState.get(0);
-    inputs.auxVelocityRPM = auxIndexerRunning ? auxIndexerRunVelocityRPM : 0.0;
-    inputs.appliedVolts =
-        new double[] {appliedVolts, auxIndexerRunning ? AUX_INDEXER_RUN_VOLTS : 0.0};
-    inputs.currentAmps = new double[] {Math.abs(inputTorqueCurrent), 0.0};
-    inputs.tempCelsius = new double[] {0.0, 0.0};
+    inputs.appliedVolts = appliedVolts;
+    inputs.currentAmps = inputTorqueCurrent;
+    inputs.tempCelsius = 0.0;
   }
 
   @Override
   public void runOpenLoop(double output) {
     closedLoop = false;
-    auxIndexerRunning = Math.abs(output) > AUX_INDEXER_RUN_EPSILON;
     setInputTorqueCurrent(output);
   }
 
   @Override
   public void runVolts(double volts) {
     closedLoop = false;
-    auxIndexerRunning = Math.abs(volts) > AUX_INDEXER_RUN_EPSILON;
     setInputVoltage(volts);
   }
 
   @Override
   public void stop() {
-    auxIndexerRunning = false;
     runOpenLoop(0.0);
   }
 
   @Override
   public void runVelocity(double radsPerSec) {
     closedLoop = true;
-    auxIndexerRunning = Math.abs(radsPerSec) > AUX_INDEXER_RUN_EPSILON;
     controller.setSetpoint(radsPerSec);
   }
 
@@ -107,20 +97,10 @@ public class IndexerIOSim implements IndexerIO {
   }
 
   @Override
-  public void setAuxIndexerVelocityRPM(double velocityRPM) {
-    auxIndexerRunVelocityRPM = Math.abs(velocityRPM);
-  }
-
-  @Override
   public void setPID(double kP, double kI, double kD) {
     // Talon velocity gains are per rotation/sec. Convert to per rad/sec for the sim controller.
     controller.setPID(
         kP / RADIANS_PER_ROTATION, kI / RADIANS_PER_ROTATION, kD / RADIANS_PER_ROTATION);
-  }
-
-  @Override
-  public void setBrakeMode(boolean enabled) {
-    // No-op in simulation
   }
 
   private void setInputTorqueCurrent(double torqueCurrent) {

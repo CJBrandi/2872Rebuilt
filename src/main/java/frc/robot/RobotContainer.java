@@ -22,7 +22,6 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
-import frc.robot.commands.FullAutoFuelPickupCommand;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.*;
 import frc.robot.subsystems.elevator.Elevator;
@@ -55,8 +54,6 @@ public class RobotContainer {
   private final Superstructure superstructure;
   private final Elevator elevator;
   private final Intake intake;
-  private final Pivot pivot;
-  private final Roller roller;
   private Tag tag;
   private Detection detection;
   // Controller
@@ -76,7 +73,6 @@ public class RobotContainer {
         camera0Config.withTurretAngleAtTimestamp(
             timestampSeconds -> RobotState.getInstance().getTurretAngleAtTime(timestampSeconds));
     TagCameraConfig runtimeCamera1Config = camera1Config;
-    Intake intakeLocal;
 
     switch (Constants.currentMode) {
       case REAL:
@@ -111,7 +107,7 @@ public class RobotContainer {
 
         elevator = new Elevator(new ElevatorIO() {});
 
-        intakeLocal =
+        intake =
             new Intake(
                 new PivotIOTalonFX(
                     Constants.IntakeConstants.PivotConstants.canId,
@@ -147,8 +143,7 @@ public class RobotContainer {
 
         elevator = new Elevator(new ElevatorIOSim());
 
-        intakeLocal =
-            new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
+        intake = new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
 
         tag =
             new Tag(
@@ -176,15 +171,12 @@ public class RobotContainer {
 
         elevator = new Elevator(new ElevatorIO() {});
 
-        intakeLocal = new Intake(new PivotIO() {}, new RollerIO() {});
+        intake = new Intake(new PivotIO() {}, new RollerIO() {});
 
         tag = new Tag(drive::addVisionMeasurement, new TagIO() {}, new TagIO() {});
         detection = new Detection(drive::getPose, new DetectionIO() {});
         break;
     }
-    intake = intakeLocal;
-    pivot = intake.getPivot();
-    roller = intake.getRoller();
 
     // Initialize FuelSim in simulation mode
     if (Constants.currentMode == Constants.Mode.SIM) {
@@ -224,8 +216,8 @@ public class RobotContainer {
           intakeYMin,
           intakeYMax,
           () ->
-              pivot.getAngle().getDegrees() <= Constants.IntakeBounds.maxDeployAngleDeg
-                  && roller.getVelocityRadsPerSec()
+              intake.getPivot().getAngle().getDegrees() <= Constants.IntakeBounds.maxDeployAngleDeg
+                  && intake.getRoller().getVelocityRadsPerSec()
                       > Constants.IntakeBounds.intakeActiveVelocityRadPerSec,
           superstructure::addFuelSimIntaked);
 
@@ -235,6 +227,27 @@ public class RobotContainer {
       // Spawn starting fuel and start simulation
       fuelSim.spawnStartingFuel();
       fuelSim.start();
+
+      superstructure.setDefaultCommand(
+          Commands.run(
+              () -> {
+                if (continuousShootingEnabled) {
+                  double currentTime = Timer.getFPGATimestamp();
+                  if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
+                    superstructure.launchFuelSim();
+                    lastShotTime = currentTime;
+                  }
+                }
+              },
+              superstructure));
+
+      controller
+          .button(4)
+          .onTrue(
+              Commands.runOnce(
+                  () -> {
+                    continuousShootingEnabled = !continuousShootingEnabled;
+                  }));
     }
 
     // Set up auto routines
@@ -301,8 +314,8 @@ public class RobotContainer {
             drive,
             () -> -controller.getLeftY(),
             () -> -controller.getLeftX(),
-            this::getDriverOmegaInput,
-            controller.rightBumper()::getAsBoolean));
+            () -> -controller.getRightX(),
+            controller.rightBumper()));
 
     controller
         .b()
@@ -315,27 +328,6 @@ public class RobotContainer {
                 .ignoringDisable(true));
 
     controller
-        .x()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  continuousShootingEnabled = !continuousShootingEnabled;
-                }));
-
-    superstructure.setDefaultCommand(
-        Commands.run(
-            () -> {
-              if (continuousShootingEnabled) {
-                double currentTime = Timer.getFPGATimestamp();
-                if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
-                  superstructure.launchFuelSim();
-                  lastShotTime = currentTime;
-                }
-              }
-            },
-            superstructure));
-
-    controller
         .a()
         .onTrue(
             Commands.runOnce(
@@ -345,41 +337,8 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    // Intake pivot presets with POV (manual override capable, latched state)
-    controller
-        .pov(180)
-        .onTrue(
-            Commands.runOnce(
-                () -> applyIntakePovState(true),
-                pivot,
-                roller));
-    controller
-        .pov(0)
-        .onTrue(
-            Commands.runOnce(
-                () -> applyIntakePovState(false),
-                pivot,
-                roller));
-
-    // Intake control
-    controller.y().whileTrue(new FullAutoFuelPickupCommand(drive, pivot, roller));
-  }
-
-  private double getDriverOmegaInput() {
-    if (Constants.currentMode == Constants.Mode.SIM) {
-      return -controller.getHID().getRawAxis(Constants.DriverController.simOmegaAxis);
-    }
-    return -controller.getRightX();
-  }
-
-  private void applyIntakePovState(boolean intaking) {
-    if (intaking) {
-      intake.setPivotGoalOverrideManual(() -> Rotation2d.fromDegrees(-5.0));
-      intake.runIntakeOverrideManual();
-    } else {
-      intake.setPivotGoalOverrideManual(() -> Intake.stowedAngle);
-      intake.stopRollerOverrideManual();
-    }
+    controller.povUp().onTrue(Commands.runOnce(intake::stow, intake));
+    controller.povDown().onTrue(Commands.runOnce(intake::deploy, intake));
   }
 
   /**
@@ -393,9 +352,7 @@ public class RobotContainer {
 
   public Command getHomingCommand() {
     return Commands.parallel(
-        superstructure.getShooter().hoodHomingCommand(),
-        superstructure.getTurret().homingSequence(),
-        elevator.homingSequence(),
-        intake.homingSequence());
+        superstructure.getShooter().hoodHomingCommand(), elevator.homingSequence());
+    // intake.homingSequence());
   }
 }

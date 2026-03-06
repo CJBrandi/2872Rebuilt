@@ -9,13 +9,10 @@ package frc.robot.subsystems.intake;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Getter;
-import org.littletonrobotics.junction.AutoLogOutput;
 
 public class Intake extends SubsystemBase {
   // Angle constants: 0° = ground/deployed, 90° = stowed
@@ -33,52 +30,30 @@ public class Intake extends SubsystemBase {
     this.roller = new Roller(rollerIO);
   }
 
-  // ==================== Pivot Control ====================
-
-  /** Set the pivot goal angle */
   public void setPivotGoal(Supplier<Rotation2d> goal) {
     pivot.setGoal(goal);
   }
 
-  /** Set the pivot goal angle in radians */
   public void setPivotGoal(DoubleSupplier goalRad) {
     pivot.setGoal(goalRad);
   }
 
-  /** Set pivot goal and override manual mode output. */
-  public void setPivotGoalOverrideManual(Supplier<Rotation2d> goal) {
-    pivot.setGoalOverrideManual(goal);
-  }
-
-  /** Set pivot goal in radians and override manual mode output. */
-  public void setPivotGoalOverrideManual(DoubleSupplier goalRad) {
-    pivot.setGoalOverrideManual(goalRad);
-  }
-
-  /** Set pivot to stowed position (90 degrees) */
   public void stow() {
     pivot.setGoal(() -> stowedAngle);
+    roller.stop();
   }
 
-  /** Set pivot to ground/deployed position (0 degrees) */
   public void deploy() {
     pivot.setGoal(() -> groundAngle);
+    roller.runIntake();
   }
 
-  /** Check if pivot is at goal */
-  @AutoLogOutput(key = "Intake/AtGoal")
   public boolean isAtGoal() {
     return pivot.isAtGoal();
   }
 
-  /** Get current pivot angle */
   public Rotation2d getPivotAngle() {
     return pivot.getAngle();
-  }
-
-  /** Home the pivot to stowed position */
-  public void homeToStowed() {
-    pivot.homeToStowed();
   }
 
   /** Returns the homing sequence command for the pivot */
@@ -86,104 +61,13 @@ public class Intake extends SubsystemBase {
     return pivot.homingSequence();
   }
 
-  /** Returns whether the pivot is homed */
-  public boolean isHomed() {
-    return pivot.isHomed();
-  }
-
-  /** Set overrides for pivot */
-  public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
-    pivot.setOverrides(coastOverride, disabledOverride);
-  }
-
-  /** Set E-stop state */
-  public void setEStopped(boolean estopped) {
-    pivot.setEStopped(estopped);
-  }
-
-  /** Check if should E-stop */
-  public boolean shouldEStop() {
-    return pivot.isShouldEStop();
-  }
-
-  // ==================== Roller Control ====================
-
-  /** Run roller at intake velocity */
-  public void runIntake() {
-    roller.runIntake();
-  }
-
-  /** Run roller at intake velocity and override manual mode output. */
-  public void runIntakeOverrideManual() {
-    roller.runIntakeOverrideManual();
-  }
-
-  /** Run roller at eject velocity */
-  public void runEject() {
-    roller.runEject();
-  }
-
-  /** Run roller at hold velocity */
-  public void runHold() {
-    roller.runHold();
-  }
-
-  /** Run roller at specific velocity (RPS) */
   public void runRollerVelocity(double velocityRPS) {
     roller.runVelocity(velocityRPS);
   }
 
-  /** Run roller at velocity and override manual mode output. */
-  public void runRollerVelocityOverrideManual(double velocityRPS) {
-    roller.runVelocityOverrideManual(velocityRPS);
-  }
-
-  /** Stop the roller */
-  public void stopRoller() {
-    roller.stop();
-  }
-
-  /** Stop roller and override manual mode output. */
-  public void stopRollerOverrideManual() {
-    roller.stopOverrideManual();
-  }
-
-  // ==================== Commands ====================
-
-  /** Command to deploy intake and run rollers */
-  public Command intakeCommand() {
-    return Commands.runEnd(
-        () -> {
-          deploy();
-          runIntake();
-        },
-        () -> {
-          stow();
-          stopRoller();
-        });
-  }
-
-  /** Command to eject game piece */
-  public Command ejectCommand() {
-    return Commands.runEnd(this::runEject, this::stopRoller);
-  }
-
-  /** Command to stow the intake */
-  public Command stowCommand() {
-    return Commands.runOnce(this::stow);
-  }
-
-  /** Command to deploy the intake */
-  public Command deployCommand() {
-    return Commands.runOnce(this::deploy);
-  }
-
-  /** Static characterization command for pivot */
   public Command staticCharacterization(double outputRampRate) {
     return pivot.staticCharacterization(outputRampRate);
   }
-
-  // ==================== Direct Access (for testing/characterization) ====================
 
   public void runVoltsPivot(double volts) {
     pivot.runVolts(volts);
@@ -199,10 +83,5 @@ public class Intake extends SubsystemBase {
 
   public void setPositionPivot(double degrees) {
     pivot.setPosition(degrees);
-  }
-
-  public void stopAll() {
-    pivot.stop();
-    roller.stop();
   }
 }
