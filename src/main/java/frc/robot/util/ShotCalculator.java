@@ -15,7 +15,6 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Filesystem;
 import frc.robot.RobotState;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.Getter;
@@ -28,6 +27,9 @@ import org.littletonrobotics.junction.Logger;
 public class ShotCalculator {
   private static final double LOOP_PERIOD_SECS = 0.02; // 20ms
   private static final double EPSILON = 1e-9;
+
+  private static final double HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS = 4.6;
+  private static final double LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS = 4.0;
 
   private static final LoggedTunableNumber accelerationFilterTimeConstantSecs =
       new LoggedTunableNumber("ShotCalculator/AccelerationFilterTimeConstantSecs", 0.12);
@@ -55,9 +57,29 @@ public class ShotCalculator {
 
   private static ShotCalculator instance;
 
-  public static ShotCalculator getInstance() {
-    if (instance == null) instance = new ShotCalculator();
-    return instance;
+  private enum ShotMode {
+    HUB,
+    LOB_LEFT,
+    LOB_RIGHT
+  }
+
+  private static class LookupProfile {
+    private final String name;
+
+    private final InterpolatingDoubleTreeMap flightTimeMap = new InterpolatingDoubleTreeMap();
+    private final InterpolatingDoubleTreeMap velocityVectorXMap = new InterpolatingDoubleTreeMap();
+    private final InterpolatingDoubleTreeMap velocityVectorYMap = new InterpolatingDoubleTreeMap();
+    private final InterpolatingDoubleTreeMap velocityVectorZMap = new InterpolatingDoubleTreeMap();
+
+    private double shooterHeight = 0.5;
+    private double targetHeight = 1.75;
+    private double minDistance = Double.MAX_VALUE;
+    private double maxDistance = 0.0;
+    private boolean loaded = false;
+
+    private LookupProfile(String name) {
+      this.name = name;
+    }
   }
 
   /** Shooting parameters for a given shot. */
@@ -71,16 +93,16 @@ public class ShotCalculator {
   private record CompensationSolution(
       Translation2d compensatedPosition, double lookaheadDistance) {}
 
-  // Lookup tables keyed by distance (meters)
-  private final InterpolatingDoubleTreeMap flightTimeMap = new InterpolatingDoubleTreeMap();
-  private final InterpolatingDoubleTreeMap velocityVectorXMap = new InterpolatingDoubleTreeMap();
-  private final InterpolatingDoubleTreeMap velocityVectorYMap = new InterpolatingDoubleTreeMap();
-  private final InterpolatingDoubleTreeMap velocityVectorZMap = new InterpolatingDoubleTreeMap();
+  private record ShotSelection(
+      ShotMode shotMode, LookupProfile lookupProfile, Translation2d targetPosition) {}
+
+  private final LookupProfile hubLookupProfile = new LookupProfile("hub_lookup_vector.json");
+  private final LookupProfile lobLookupProfile = new LookupProfile("lob_lookup_vector.json");
 
   @Getter private double shooterHeight = 0.5;
   @Getter private double targetHeight = 1.75;
   @Getter private double minDistance = Double.MAX_VALUE;
-  @Getter private double maxDistance = 0;
+  @Getter private double maxDistance = 0.0;
   @Getter private boolean loaded = false;
   @Getter private boolean shootOnMoveEnabled = true;
 
@@ -99,7 +121,12 @@ public class ShotCalculator {
   private Translation3d filteredShooterFieldAcceleration = new Translation3d();
 
   // Robot to turret offset (adjust for your robot)
-  private final Translation2d robotToTurret = new Translation2d(0, 0);
+  private final Translation2d robotToTurret = new Translation2d(0.0, 0.0);
+
+  public static ShotCalculator getInstance() {
+    if (instance == null) instance = new ShotCalculator();
+    return instance;
+  }
 
   private ShotCalculator() {
     load();
@@ -113,16 +140,25 @@ public class ShotCalculator {
   /** Loads shot lookups from the deploy directory. */
   private void load() {
     Path deployPath = Filesystem.getDeployDirectory().toPath();
-    loadVectorLookup(deployPath.resolve("hub_lookup_vector.json"));
+    loadVectorLookup(deployPath.resolve("hub_lookup_vector.json"), hubLookupProfile);
+    loadVectorLookup(deployPath.resolve("lob_lookup_vector.json"), lobLookupProfile);
+    loaded = hubLookupProfile.loaded || lobLookupProfile.loaded;
   }
 
-  private void loadVectorLookup(Path path) {
+  private void loadVectorLookup(Path path, LookupProfile profile) {
+    profile.flightTimeMap.clear();
+    profile.velocityVectorXMap.clear();
+    profile.velocityVectorYMap.clear();
+    profile.velocityVectorZMap.clear();
+    profile.minDistance = Double.MAX_VALUE;
+    profile.maxDistance = 0.0;
+
     try (BufferedReader reader = Files.newBufferedReader(path)) {
       Gson gson = new Gson();
       JsonObject root = gson.fromJson(reader, JsonObject.class);
       JsonObject config = root.getAsJsonObject("config");
-      shooterHeight = config.get("shooter_height_m").getAsDouble();
-      targetHeight = config.get("target_height_m").getAsDouble();
+      profile.shooterHeight = config.get("shooter_height_m").getAsDouble();
+      profile.targetHeight = config.get("target_height_m").getAsDouble();
 
       JsonArray entriesJson = root.getAsJsonArray("entries");
       int count = 0;
@@ -133,30 +169,31 @@ public class ShotCalculator {
         JsonObject vector = entry.getAsJsonObject("velocity_vector_mps");
         double flightTime = entry.get("flight_time").getAsDouble();
 
-        velocityVectorXMap.put(distance, vector.get("x").getAsDouble());
-        velocityVectorYMap.put(distance, vector.get("y").getAsDouble());
-        velocityVectorZMap.put(distance, vector.get("z").getAsDouble());
-        flightTimeMap.put(distance, flightTime);
-        minDistance = Math.min(minDistance, distance);
-        maxDistance = Math.max(maxDistance, distance);
+        profile.velocityVectorXMap.put(distance, vector.get("x").getAsDouble());
+        profile.velocityVectorYMap.put(distance, vector.get("y").getAsDouble());
+        profile.velocityVectorZMap.put(distance, vector.get("z").getAsDouble());
+        profile.flightTimeMap.put(distance, flightTime);
+        profile.minDistance = Math.min(profile.minDistance, distance);
+        profile.maxDistance = Math.max(profile.maxDistance, distance);
         count++;
       }
 
-      loaded = count > 0;
-      if (loaded) {
+      profile.loaded = count > 0;
+      if (profile.loaded) {
         System.out.println(
-            "ShotCalculator: Loaded hub_lookup_vector.json with "
+            "ShotCalculator: Loaded "
+                + profile.name
+                + " with "
                 + count
                 + " entries ("
-                + minDistance
+                + profile.minDistance
                 + "m - "
-                + maxDistance
+                + profile.maxDistance
                 + "m)");
       }
-    } catch (IOException e) {
-      loaded = false;
-      System.err.println(
-          "ShotCalculator: Failed to load hub_lookup_vector.json: " + e.getMessage());
+    } catch (Exception e) {
+      profile.loaded = false;
+      System.err.println("ShotCalculator: Failed to load " + profile.name + ": " + e.getMessage());
     }
   }
 
@@ -170,7 +207,21 @@ public class ShotCalculator {
     Pose2d robotPose = RobotState.getInstance().getRobotPose();
     ChassisSpeeds robotVelocity = RobotState.getInstance().getRobotVelocity();
 
-    Translation2d targetPosition = getAllianceTransposedTargetPosition();
+    ShotSelection selection = selectShotSelection(robotPose);
+    LookupProfile lookupProfile = selection.lookupProfile();
+    if (!lookupProfile.loaded) {
+      shotStable = false;
+      Logger.recordOutput("ShotCalculator/ShotMode", selection.shotMode().name());
+      Logger.recordOutput("ShotCalculator/VectorLookupLoaded", false);
+      return new ShootingParameters(Rotation2d.kZero, 0.0, 0.0, 0.0, 0.0);
+    }
+
+    shooterHeight = lookupProfile.shooterHeight;
+    targetHeight = lookupProfile.targetHeight;
+    minDistance = lookupProfile.minDistance;
+    maxDistance = lookupProfile.maxDistance;
+
+    Translation2d targetPosition = selection.targetPosition();
     Translation2d turretPosition =
         robotPose.getTranslation().plus(robotToTurret.rotateBy(robotPose.getRotation()));
     Translation3d shooterFieldVelocity =
@@ -180,15 +231,15 @@ public class ShotCalculator {
 
     double currentDistance = targetPosition.getDistance(turretPosition);
     CompensationSolution compensationSolution =
-        new CompensationSolution(turretPosition, clampDistance(currentDistance));
+        new CompensationSolution(turretPosition, clampDistance(currentDistance, lookupProfile));
 
     Rotation2d lookupYaw =
         normalizeTo0To2Pi(
             targetPosition.minus(compensationSolution.compensatedPosition()).getAngle());
-    Translation3d lookupVector = getLookupVector(compensationSolution.lookaheadDistance());
+    Translation3d lookupVector = getLookupVector(compensationSolution.lookaheadDistance(), lookupProfile);
     Translation3d requiredFieldVelocity =
         ShotVectorCompensator.orientLookupVectorToField(lookupVector, lookupYaw);
-    double tof = flightTimeMap.get(compensationSolution.lookaheadDistance());
+    double tof = lookupProfile.flightTimeMap.get(compensationSolution.lookaheadDistance());
     double predictionTimeSecs = Math.max(0.0, releasePredictionSecs.get());
     double accelGain = Math.max(0.0, accelerationCompensationGain.get());
     Translation3d weightedAcceleration = shooterFieldAcceleration.times(accelGain);
@@ -222,8 +273,15 @@ public class ShotCalculator {
             lookupYaw, shot, turretPosition, compensationSolution.compensatedPosition());
 
     Logger.recordOutput("ShotCalculator/ShootOnMoveEnabled", shootOnMoveEnabled);
-    Logger.recordOutput("ShotCalculator/VectorLookupLoaded", loaded);
+    Logger.recordOutput("ShotCalculator/VectorLookupLoaded", true);
+    Logger.recordOutput("ShotCalculator/HubLookupLoaded", hubLookupProfile.loaded);
+    Logger.recordOutput("ShotCalculator/LobLookupLoaded", lobLookupProfile.loaded);
+    Logger.recordOutput("ShotCalculator/ShotMode", selection.shotMode().name());
     Logger.recordOutput("ShotCalculator/ShotStable", shotStable);
+    Logger.recordOutput("ShotCalculator/SelectionRobotX", robotPose.getX());
+    Logger.recordOutput("ShotCalculator/SelectionRobotY", robotPose.getY());
+    Logger.recordOutput(
+        "ShotCalculator/TargetPosition", new double[] {targetPosition.getX(), targetPosition.getY()});
     Logger.recordOutput(
         "ShotCalculator/CompensatedPosition",
         new Pose2d(compensationSolution.compensatedPosition(), turretAngle));
@@ -265,6 +323,25 @@ public class ShotCalculator {
 
     return new ShootingParameters(
         turretAngle, turretVelocity, pitchAngle, pitchVelocity, exitVelocity);
+  }
+
+  private ShotSelection selectShotSelection(Pose2d robotPose) {
+    if (robotPose.getX() < HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS) {
+      return new ShotSelection(
+          ShotMode.HUB, hubLookupProfile, getAllianceTransposedTargetPosition(FieldConstants.Hub.topCenterPoint));
+    }
+
+    if (robotPose.getY() > LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS) {
+      return new ShotSelection(
+          ShotMode.LOB_LEFT,
+          lobLookupProfile,
+          getAllianceTransposedTargetPosition(FieldConstants.Lob.LOB_LEFT));
+    }
+
+    return new ShotSelection(
+        ShotMode.LOB_RIGHT,
+        lobLookupProfile,
+        getAllianceTransposedTargetPosition(FieldConstants.Lob.LOB_RIGHT));
   }
 
   private boolean evaluateStabilityGate(
@@ -339,27 +416,28 @@ public class ShotCalculator {
     return filteredShooterFieldAcceleration;
   }
 
-  private double clampDistance(double distance) {
-    return Math.max(minDistance, Math.min(maxDistance, distance));
+  private double clampDistance(double distance, LookupProfile lookupProfile) {
+    return Math.max(lookupProfile.minDistance, Math.min(lookupProfile.maxDistance, distance));
   }
 
-  private Translation3d getLookupVector(double distance) {
+  private Translation3d getLookupVector(double distance, LookupProfile lookupProfile) {
     return new Translation3d(
-        velocityVectorXMap.get(distance),
-        velocityVectorYMap.get(distance),
-        velocityVectorZMap.get(distance));
+        lookupProfile.velocityVectorXMap.get(distance),
+        lookupProfile.velocityVectorYMap.get(distance),
+        lookupProfile.velocityVectorZMap.get(distance));
   }
 
   /** Returns target position transposed for the current alliance (blue or red). */
-  private Translation2d getAllianceTransposedTargetPosition() {
+  private Translation2d getAllianceTransposedTargetPosition(
+      FieldConstants.FlippableTranslation3d targetPoint) {
     if (DriverStation.getAlliance().isPresent()
         && DriverStation.getAlliance().get() == DriverStation.Alliance.Red) {
       Logger.recordOutput("ShotCalculator/Alliance", "Red");
-      return FieldConstants.Hub.topCenterPoint.getRed().toTranslation2d();
+      return targetPoint.getRed().toTranslation2d();
     }
 
     Logger.recordOutput("ShotCalculator/Alliance", "Blue");
-    return FieldConstants.Hub.topCenterPoint.getBlue().toTranslation2d();
+    return targetPoint.getBlue().toTranslation2d();
   }
 
   private static Rotation2d normalizeTo0To2Pi(Rotation2d angle) {

@@ -258,6 +258,12 @@ public class FieldConstants {
             AprilTagLayoutType.OFFICIAL.getLayout().getTagPose(21).get().toPose2d());
   }
 
+  /** Lob-shot targets (defined in blue-alliance field coordinates). */
+  public static class Lob {
+    public static final FlippableTranslation3d LOB_RIGHT = new FlippableTranslation3d(2.0, 1.0, 0.0);
+    public static final FlippableTranslation3d LOB_LEFT = new FlippableTranslation3d(2.0, 7.0, 0.0);
+  }
+
   /** Left Bump related constants */
   public static class LeftBump {
 

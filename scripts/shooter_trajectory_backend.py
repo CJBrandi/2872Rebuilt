@@ -210,10 +210,8 @@ def solve_trajectory(
 
     # Extract components
     p = X[:3, :]  # positions
-    p_x, p_y, p_z = X[0, :], X[1, :], X[2, :]
 
     v = X[3:, :]  # velocities
-    v_x, v_y, v_z = X[3, :], X[4, :], X[5, :]
 
     # Initial velocity relative to shooter
     v0_wrt_shooter = X[3:, :1]
@@ -225,8 +223,8 @@ def solve_trajectory(
     # Position: linear interpolation with parabolic arc for z
     for k in range(N):
         t = k / (N - 1) if N > 1 else 0
-        p_x[k].set_value(_lerp(shooter_pos[0, 0], target_pos[0, 0], t))
-        p_y[k].set_value(_lerp(shooter_pos[1, 0], target_pos[1, 0], t))
+        X[0, k].set_value(_lerp(shooter_pos[0, 0], target_pos[0, 0], t))
+        X[1, k].set_value(_lerp(shooter_pos[1, 0], target_pos[1, 0], t))
 
         # Parabolic arc for height
         z_start = shooter_pos[2, 0]
@@ -236,7 +234,7 @@ def solve_trajectory(
             z_guess = _lerp(z_start, z_peak, t * 2)
         else:
             z_guess = _lerp(z_peak, z_end, (t - 0.5) * 2)
-        p_z[k].set_value(z_guess)
+        X[2, k].set_value(z_guess)
 
     # Velocity: initial guess pointing toward target
     direction = target_pos - shooter_pos
@@ -257,8 +255,8 @@ def solve_trajectory(
     problem.subject_to(p[:, -1:] == target_pos)
 
     # 3. Launch pitch constraints at release (initial velocity at shooter)
-    horizontal_speed_sq_0 = v_x[0] ** 2 + v_y[0] ** 2
-    vertical_speed_0 = v_z[0]
+    horizontal_speed_sq_0 = X[3, 0] ** 2 + X[4, 0] ** 2
+    vertical_speed_0 = X[5, 0]
 
     # Must launch upward.
     problem.subject_to(vertical_speed_0 >= 0.0)
@@ -276,8 +274,8 @@ def solve_trajectory(
 
     # 4. Entry angle constraint at the target point
     # Ball must be descending and within max entry angle from vertical.
-    horizontal_speed_sq = v_x[-1] ** 2 + v_y[-1] ** 2
-    vertical_speed = v_z[-1]
+    horizontal_speed_sq = X[3, N - 1] ** 2 + X[4, N - 1] ** 2
+    vertical_speed = X[5, N - 1]
 
     # Must be going downward
     problem.subject_to(vertical_speed < 0.0)
@@ -302,7 +300,7 @@ def solve_trajectory(
 
     # 6. Height constraint (stay above ground)
     for k in range(N):
-        problem.subject_to(p_z[k] >= 0.0)
+        problem.subject_to(X[2, k] >= 0.0)
 
     # =========================================================================
     # OBJECTIVE: Minimize flight time
@@ -344,8 +342,24 @@ def solve_trajectory(
     entry_angle_rad = math.atan2(entry_horizontal, entry_vertical)
 
     # Validate constraints from extracted trajectory values. The optimization
-    # enforces these, but we guard against numerical tolerance issues.
+    # should enforce these, but we guard against numerical tolerance issues.
     constraint_tolerance_rad = math.radians(0.05)
+    if pitch_rad < config.min_launch_pitch_rad - constraint_tolerance_rad:
+        raise RuntimeError(
+            "Launch pitch constraint violated: "
+            f"{math.degrees(pitch_rad):.3f}° < "
+            f"{config.min_launch_pitch_deg:.3f}°."
+        )
+    if pitch_rad > config.max_launch_pitch_rad + constraint_tolerance_rad:
+        raise RuntimeError(
+            "Launch pitch constraint violated: "
+            f"{math.degrees(pitch_rad):.3f}° > "
+            f"{config.max_launch_pitch_deg:.3f}°."
+        )
+
+    if v_final[2, 0] >= 0.0:
+        raise RuntimeError("Entry velocity must be descending at the target.")
+
     if entry_angle_rad > config.max_entry_angle_rad + constraint_tolerance_rad:
         raise RuntimeError(
             "Entry angle constraint violated: "
@@ -364,9 +378,9 @@ def solve_trajectory(
 
     # Include trajectory if requested
     if return_trajectory:
-        result.trajectory_x = p_x.value().flatten()
-        result.trajectory_y = p_y.value().flatten()
-        result.trajectory_z = p_z.value().flatten()
+        result.trajectory_x = X[0, :].value().flatten()
+        result.trajectory_y = X[1, :].value().flatten()
+        result.trajectory_z = X[2, :].value().flatten()
 
     return result
 
