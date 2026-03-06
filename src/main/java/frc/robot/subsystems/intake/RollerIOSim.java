@@ -50,7 +50,6 @@ public class RollerIOSim implements RollerIO {
     }
 
     inputs.talonConnected = true;
-    inputs.CANRangeConnected = true;
     sim.update(Constants.loopPeriodSecs);
     inputs.talonPositionRads = sim.getAngularPositionRad();
     inputs.talonVelocityRadsPerSec = sim.getAngularVelocityRadPerSec();

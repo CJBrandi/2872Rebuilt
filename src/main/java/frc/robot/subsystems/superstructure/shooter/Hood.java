@@ -150,6 +150,10 @@ public class Hood {
     Logger.recordOutput("Shooter/Hood/AtGoal", atGoal);
     Logger.recordOutput("Shooter/Hood/ClosedLoop", closedLoop);
     Logger.recordOutput("Shooter/Hood/Homed", homed);
+    Logger.recordOutput(
+        "Shooter/Hood/TargetClampErrorDeg",
+        Math.toDegrees(
+            targetAngleRad - MathUtil.clamp(targetAngleRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD)));
   }
 
   /**

@@ -11,15 +11,12 @@ import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
-import com.ctre.phoenix6.configs.CANrangeConfiguration;
-import com.ctre.phoenix6.configs.ProximityParamsConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
-import com.ctre.phoenix6.hardware.CANrange;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -31,7 +28,6 @@ import edu.wpi.first.units.measure.*;
 /** Roller IO implementation using a Kraken X44. */
 public class RollerIOTalonFX implements RollerIO {
   private final TalonFX talon;
-  private final CANrange canRange;
 
   // Config
   private final TalonFXConfiguration config = new TalonFXConfiguration();
@@ -43,10 +39,6 @@ public class RollerIOTalonFX implements RollerIO {
   private final StatusSignal<Current> torqueCurrent;
   private final StatusSignal<Temperature> tempCelsius;
 
-  private final StatusSignal<Distance> distance;
-  private final StatusSignal<Boolean> isDetected;
-  private final StatusSignal<Time> measureTimestamp;
-
   // Control requests
   private final VelocityTorqueCurrentFOC velocityTorqueCurrentFOC =
       new VelocityTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
@@ -56,9 +48,8 @@ public class RollerIOTalonFX implements RollerIO {
 
   private final Debouncer connectedDebouncer = new Debouncer(0.5);
 
-  public RollerIOTalonFX(int canId, int canRangeId, String canBus) {
+  public RollerIOTalonFX(int canId, String canBus) {
     talon = new TalonFX(canId, canBus);
-    canRange = new CANrange(canRangeId, canBus);
 
     // Configure for Kraken X44 with velocity control
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
@@ -78,17 +69,6 @@ public class RollerIOTalonFX implements RollerIO {
     torqueCurrent = talon.getTorqueCurrent();
     tempCelsius = talon.getDeviceTemp();
 
-    CANrangeConfiguration canRangeConfig = new CANrangeConfiguration();
-    ProximityParamsConfigs proximityParamsConfigs = new ProximityParamsConfigs();
-    proximityParamsConfigs.withProximityThreshold(0.2);
-    proximityParamsConfigs.withMinSignalStrengthForValidMeasurement(10000);
-    canRangeConfig.withProximityParams(proximityParamsConfigs);
-    tryUntilOk(5, () -> canRange.getConfigurator().apply(canRangeConfig));
-
-    distance = canRange.getDistance();
-    isDetected = canRange.getIsDetected();
-    measureTimestamp = canRange.getMeasurementTime();
-
     tryUntilOk(
         5,
         () ->
@@ -99,11 +79,8 @@ public class RollerIOTalonFX implements RollerIO {
                 appliedVoltage,
                 supplyCurrent,
                 torqueCurrent,
-                tempCelsius,
-                distance,
-                isDetected,
-                measureTimestamp));
-    ParentDevice.optimizeBusUtilizationForAll(canRange, talon);
+                tempCelsius));
+    ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 
   @Override
@@ -113,10 +90,6 @@ public class RollerIOTalonFX implements RollerIO {
             BaseStatusSignal.refreshAll(
                     position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, tempCelsius)
                 .isOK());
-    inputs.CANRangeConnected =
-        connectedDebouncer.calculate(BaseStatusSignal.refreshAll(distance, isDetected).isOK());
-    inputs.measuredTimestamp = measureTimestamp.getValueAsDouble();
-    inputs.hasCoral = isDetected.getValue();
     inputs.talonPositionRads = Units.rotationsToRadians(position.getValueAsDouble());
     inputs.talonVelocityRadsPerSec = Units.rotationsToRadians(velocity.getValueAsDouble());
     inputs.talonAppliedVoltage = appliedVoltage.getValueAsDouble();

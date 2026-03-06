@@ -51,7 +51,7 @@ public class ShotCalculator {
   private static final LoggedTunableNumber stabilityMaxCommandedSpeedMps =
       new LoggedTunableNumber("ShotCalculator/StabilityMaxCommandedSpeedMps", 18.0);
   private static final LoggedTunableNumber stabilityMaxPitchDeg =
-      new LoggedTunableNumber("ShotCalculator/StabilityMaxPitchDeg", 85.0);
+      new LoggedTunableNumber("ShotCalculator/StabilityMaxPitchDeg", 72.5);
 
   private static ShotCalculator instance;
 

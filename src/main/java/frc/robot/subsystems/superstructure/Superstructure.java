@@ -40,16 +40,11 @@ public class Superstructure extends SubsystemBase {
       turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
     }
 
-    /*
-       boolean readyToShoot = isReadyToShoot();
-       if (readyToShoot) {
-         indexer.runIntakeVelocity();
-       } else {
-         indexer.stop();
-       }
-
-    */
-    indexer.runIntakeVelocity();
+    if (isReadyToShoot()) {
+      indexer.runIntakeVelocity();
+    } else {
+      indexer.stop();
+    }
 
     // Logger.recordOutput("Superstructure/ReadyToShoot", readyToShoot);
     Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);

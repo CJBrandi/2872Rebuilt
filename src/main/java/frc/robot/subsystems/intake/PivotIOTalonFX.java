@@ -73,7 +73,7 @@ public class PivotIOTalonFX implements PivotIO {
     Config.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
     Config.CurrentLimits.StatorCurrentLimit = 40.0;
     Config.CurrentLimits.StatorCurrentLimitEnable = true;
-    Config.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+    Config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     tryUntilOk(5, () -> talon.getConfigurator().apply(Config, 0.25));
 
     // Home to stowed position (90 degrees)

@@ -66,15 +66,16 @@ public final class Constants {
   }
 
   public static class IntakeConstants {
-    public static final String canBus = "*";
+    public static final String canBus = "";
 
     public static class PivotConstants {
-      public static final int canId = 6;
+      public static final int canId = 49;
+      public static final double reduction = 670.0 / 11;
     }
 
     public static class RollerConstants {
-      public static final int canId = 5;
-      public static final int canRangeId = 4;
+      public static final int canId = 50;
+      public static final double reduction = 4.0;
     }
   }
 

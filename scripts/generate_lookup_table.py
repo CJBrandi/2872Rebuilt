@@ -75,6 +75,10 @@ def generate_lookup_table(
         print(f"  Target height:     {config.target_height:.3f} m ({config.target_height / 0.0254:.1f} in)")
         print(f"  Shooter height:    {config.shooter_height:.3f} m ({config.shooter_height / 0.0254:.1f} in)")
         print(f"  Max entry angle:   {config.max_entry_angle_deg:.1f}° from vertical")
+        print(
+            f"  Launch pitch:      {config.min_launch_pitch_deg:.1f}° to "
+            f"{config.max_launch_pitch_deg:.1f}° above horizontal"
+        )
         print(f"  Ball mass:         {config.ball_mass:.3f} kg")
         print(f"  Ball diameter:     {config.ball_diameter * 1000:.1f} mm")
         print(f"  Drag coefficient:  {config.drag_coefficient}")
@@ -92,7 +96,12 @@ def generate_lookup_table(
     success_count = 0
 
     for dist in distances:
-        result = solve_trajectory(dist, config, verbose=False)
+        try:
+            result = solve_trajectory(dist, config, verbose=False)
+        except RuntimeError as error:
+            raise RuntimeError(
+                f"Trajectory solve failed constraint validation at distance {dist:.2f} m: {error}"
+            ) from error
 
         if result is not None:
             success_count += 1
@@ -111,9 +120,10 @@ def generate_lookup_table(
                       f"{result.pitch_deg:8.2f}  {result.flight_time:8.3f}  "
                       f"{result.entry_angle_deg:8.2f}")
         else:
-            entries.append(None)
-            if verbose:
-                print(f"{dist:8.2f}  {'NO SOLUTION':^54}")
+            raise RuntimeError(
+                "No feasible constrained trajectory at "
+                f"distance {dist:.2f} m. Relax constraints or adjust range."
+            )
 
     if verbose:
         print("-" * 70)
@@ -132,6 +142,8 @@ def generate_lookup_table(
             "target_height_m": config.target_height,
             "shooter_height_m": config.shooter_height,
             "max_entry_angle_deg": config.max_entry_angle_deg,
+            "min_launch_pitch_deg": config.min_launch_pitch_deg,
+            "max_launch_pitch_deg": config.max_launch_pitch_deg,
             "ball_mass_kg": config.ball_mass,
             "ball_diameter_m": config.ball_diameter,
             "drag_coefficient": config.drag_coefficient,
@@ -161,20 +173,37 @@ def generate_vector_lookup_table(lookup_table: dict) -> dict:
     Returns:
         Vector lookup table dictionary
     """
+    config = lookup_table["config"]
+    min_pitch_rad = math.radians(config["min_launch_pitch_deg"])
+    max_pitch_rad = math.radians(config["max_launch_pitch_deg"])
+    max_horizontal_ratio = math.tan(max_pitch_rad)
+
     vector_entries = []
     for entry in lookup_table["entries"]:
         speed = entry["velocity"]
-        pitch = entry["pitch"]
+        pitch = max(min_pitch_rad, min(max_pitch_rad, entry["pitch"]))
+        # Keep stored pitch safely inside bounds after decimal serialization.
+        if abs(pitch - max_pitch_rad) < 1e-9:
+            pitch = math.floor(max_pitch_rad * 1_000_000.0) / 1_000_000.0
+        elif abs(pitch - min_pitch_rad) < 1e-9:
+            pitch = math.ceil(min_pitch_rad * 1_000_000.0) / 1_000_000.0
+
         horizontal_speed = speed * math.cos(pitch)
         vertical_speed = speed * math.sin(pitch)
+        x = round(horizontal_speed, 5)
+        z = round(vertical_speed, 5)
+
+        # Ensure serialized vector respects launch pitch cap exactly.
+        if x > 0.0 and z / x > max_horizontal_ratio:
+            z = round(max_horizontal_ratio * x, 5)
 
         vector_entries.append(
             {
                 "distance": entry["distance"],
                 "velocity_vector_mps": {
-                    "x": round(horizontal_speed, 4),
+                    "x": x,
                     "y": 0.0,
-                    "z": round(vertical_speed, 4),
+                    "z": z,
                 },
                 "speed_mps": round(speed, 4),
                 "pitch_rad": round(pitch, 6),
@@ -224,11 +253,19 @@ def main():
     )
     parser.add_argument(
         "--shooter-height", type=float, default=None,
-        help="Shooter height in meters (default: 20 inches)"
+        help="Shooter height in meters (default: 21 inches)"
     )
     parser.add_argument(
         "--entry-angle", type=float, default=None,
-        help="Maximum allowed entry angle from vertical in degrees (default: 30°)"
+        help="Maximum allowed entry angle from vertical in degrees"
+    )
+    parser.add_argument(
+        "--min-launch-pitch", type=float, default=None,
+        help="Minimum launch pitch above horizontal in degrees"
+    )
+    parser.add_argument(
+        "--max-launch-pitch", type=float, default=None,
+        help="Maximum launch pitch above horizontal in degrees"
     )
     parser.add_argument(
         "--quiet", "-q", action="store_true",
@@ -245,6 +282,10 @@ def main():
         config.shooter_height = args.shooter_height
     if args.entry_angle is not None:
         config.max_entry_angle_deg = args.entry_angle
+    if args.min_launch_pitch is not None:
+        config.min_launch_pitch_deg = args.min_launch_pitch
+    if args.max_launch_pitch is not None:
+        config.max_launch_pitch_deg = args.max_launch_pitch
 
     # Generate lookup table
     lookup_table = generate_lookup_table(

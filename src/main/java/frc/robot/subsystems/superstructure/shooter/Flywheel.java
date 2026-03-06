@@ -91,7 +91,7 @@ public class Flywheel {
 
     // Check if at setpoint (compare against slew-limited setpoint, not final target)
     if (closedLoop) {
-      double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(50);
+      double toleranceRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(400);
       atSetpoint =
           EqualsUtil.epsilonEquals(
               inputs.velocityRadPerSec, velocitySetpointRadPerSec, toleranceRadPerSec);

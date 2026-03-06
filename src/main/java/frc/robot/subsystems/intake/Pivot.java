@@ -8,6 +8,7 @@
 package frc.robot.subsystems.intake;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
@@ -37,13 +38,23 @@ public class Pivot extends SubsystemBase {
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Intake/Pivot/kS");
   private static final LoggedTunableNumber kG = new LoggedTunableNumber("Intake/Pivot/kG");
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Intake/Pivot/MaxVelocityDegreesPerSec", 360);
+      new LoggedTunableNumber("Intake/Pivot/MaxVelocityDegreesPerSec", 120);
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Intake/Pivot/MaxAccelerationDegreesPerSec2", 1080);
+      new LoggedTunableNumber("Intake/Pivot/MaxAccelerationDegreesPerSec2", 360);
   private static final LoggedTunableNumber staticVelocityThresh =
       new LoggedTunableNumber("Intake/Pivot/staticVelocityThresh", 0.1);
   private static final LoggedTunableNumber tolerance =
       new LoggedTunableNumber("Intake/Pivot/Tolerance", 45);
+  private static final LoggedTunableNumber manualModeEnabled =
+      new LoggedTunableNumber("Manual/Enabled", 0.0);
+  private static final LoggedTunableNumber manualPivotAngleDeg =
+      new LoggedTunableNumber("Manual/IntakePivotDeg", 90.0);
+  private static final LoggedTunableNumber homingVolts =
+      new LoggedTunableNumber("Intake/Pivot/HomingVolts", 2.0);
+  private static final LoggedTunableNumber homingVelocityThresh =
+      new LoggedTunableNumber("Intake/Pivot/HomingVelocityThreshRadPerSec", 0.3);
+  private static final LoggedTunableNumber homingTimeSecs =
+      new LoggedTunableNumber("Intake/Pivot/HomingTimeSecs", 0.1);
 
   static {
     switch (Constants.getCurrentMode()) {
@@ -54,9 +65,9 @@ public class Pivot extends SubsystemBase {
         kG.initDefault(0.0);
       }
       default -> {
-        kP.initDefault(1600);
-        kD.initDefault(100);
-        kS.initDefault(4);
+        kP.initDefault(3300);
+        kD.initDefault(50);
+        kS.initDefault(3);
         kG.initDefault(0);
       }
     }
@@ -91,7 +102,10 @@ public class Pivot extends SubsystemBase {
   private boolean atGoal = false;
 
   // Homed state is explicit and can be controlled directly.
-  @AutoLogOutput @Getter @Setter private boolean homed = false;
+  @Getter @Setter private boolean homed = false;
+  private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
+  private boolean manualOverrideActive = false;
+  private boolean wasManualModeEnabled = false;
 
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
@@ -147,6 +161,15 @@ public class Pivot extends SubsystemBase {
     }
 
     // Run profile
+    boolean manualModeEnabledNow = manualModeEnabled.get() > 0.5;
+    if (!manualModeEnabledNow) {
+      manualOverrideActive = false;
+    } else if (!wasManualModeEnabled || manualPivotAngleDeg.hasChanged(hashCode())) {
+      manualOverrideActive = false;
+    }
+    boolean manualMode = manualModeEnabledNow && !manualOverrideActive;
+    wasManualModeEnabled = manualModeEnabledNow;
+
     final boolean shouldRunProfile =
         !stopProfile
             && !coastOverride.getAsBoolean()
@@ -157,7 +180,8 @@ public class Pivot extends SubsystemBase {
     Logger.recordOutput("Intake/Pivot/RunningProfile", shouldRunProfile);
 
     // Check if out of tolerance
-    boolean outOfTolerance = Math.abs(angle.getRadians() - setpoint.position) > tolerance.get();
+    boolean outOfTolerance =
+        Units.radiansToDegrees(Math.abs(angle.getRadians() - setpoint.position)) > tolerance.get();
 
     shouldEStop =
         outOfTolerance && shouldRunProfile
@@ -165,11 +189,16 @@ public class Pivot extends SubsystemBase {
             || angle.getRadians() > Intake.maxAngle.getRadians();
 
     if (shouldRunProfile) {
+      double goalRadians =
+          manualMode
+              ? Rotation2d.fromDegrees(manualPivotAngleDeg.get()).getRadians()
+              : goal.getAsDouble();
+
       // Clamp goal
       var goalState =
           new State(
               MathUtil.clamp(
-                  goal.getAsDouble(), Intake.minAngle.getRadians(), Intake.maxAngle.getRadians()),
+                  goalRadians, Intake.minAngle.getRadians(), Intake.maxAngle.getRadians()),
               0.0);
       setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
       io.runPosition(
@@ -192,6 +221,7 @@ public class Pivot extends SubsystemBase {
       Logger.recordOutput("Intake/Pivot/Profile/GoalVelocityRadPerSec", goalState.velocity);
       Logger.recordOutput(
           "Intake/Pivot/Profile/GoalVelocityDegPerSec", Math.toDegrees(goalState.velocity));
+      Logger.recordOutput("Intake/Pivot/Homed", homed);
     } else {
       // Reset setpoint
       setpoint = new State(angle.getRadians(), 0.0);
@@ -209,7 +239,10 @@ public class Pivot extends SubsystemBase {
     // Log state
     Logger.recordOutput("Intake/Pivot/CoastOverride", coastOverride.getAsBoolean());
     Logger.recordOutput("Intake/Pivot/DisabledOverride", disabledOverride.getAsBoolean());
-    Logger.recordOutput("Intake/Pivot/MeasuredPositionRad", angle.getRadians());
+    Logger.recordOutput("Intake/Pivot/ManualMode", manualMode);
+    Logger.recordOutput("Intake/Pivot/ManualModeEnabled", manualModeEnabledNow);
+    Logger.recordOutput("Intake/Pivot/ManualOverrideActive", manualOverrideActive);
+    Logger.recordOutput("Intake/Pivot/Manual/TargetAngleDeg", manualPivotAngleDeg.get());
     Logger.recordOutput("Intake/Pivot/MeasuredPositionDeg", angle.getDegrees());
     Logger.recordOutput("Intake/Pivot/MeasuredVelocityRadPerSec", inputs.velocityRadPerSec);
     Logger.recordOutput(
@@ -222,6 +255,17 @@ public class Pivot extends SubsystemBase {
 
   public void setGoal(DoubleSupplier goal) {
     atGoal = false;
+    manualOverrideActive = false;
+    this.goal = goal;
+  }
+
+  public void setGoalOverrideManual(Supplier<Rotation2d> goal) {
+    setGoalOverrideManual(() -> goal.get().getRadians());
+  }
+
+  public void setGoalOverrideManual(DoubleSupplier goal) {
+    atGoal = false;
+    manualOverrideActive = true;
     this.goal = goal;
   }
 
@@ -271,7 +315,40 @@ public class Pivot extends SubsystemBase {
    * @return Command that runs the homing sequence
    */
   public Command homingSequence() {
-    return Commands.runOnce(() -> homed = true, this);
+    return Commands.startRun(
+            () -> {
+              stopProfile = true;
+              homed = false;
+              manualOverrideActive = false;
+              homingDebouncer = new Debouncer(homingTimeSecs.get());
+              homingDebouncer.calculate(false);
+            },
+            () -> {
+              if (disabledOverride.getAsBoolean() || coastOverride.getAsBoolean()) {
+                io.stop();
+                return;
+              }
+              io.runVolts(Math.abs(homingVolts.get()));
+              homed =
+                  homingDebouncer.calculate(
+                      Math.abs(inputs.velocityRadPerSec) <= homingVelocityThresh.get());
+              Logger.recordOutput("Intake/Pivot/Homing", true);
+              Logger.recordOutput("Intake/Pivot/HomingVelocityRadPerSec", inputs.velocityRadPerSec);
+            },
+            this)
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              homeToStowed();
+              setpoint = new State(Intake.stowedAngle.getRadians(), 0.0);
+              homed = true;
+            })
+        .finallyDo(
+            () -> {
+              stopProfile = false;
+              io.stop();
+              Logger.recordOutput("Intake/Pivot/Homing", false);
+            });
   }
 
   public Command staticCharacterization(double outputRampRate) {

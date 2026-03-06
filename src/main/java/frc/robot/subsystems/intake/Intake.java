@@ -19,7 +19,7 @@ import org.littletonrobotics.junction.AutoLogOutput;
 
 public class Intake extends SubsystemBase {
   // Angle constants: 0° = ground/deployed, 90° = stowed
-  public static final Rotation2d minAngle = Rotation2d.fromDegrees(0);
+  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-15);
   public static final Rotation2d maxAngle = Rotation2d.fromDegrees(90);
   public static final Rotation2d stowedAngle = Rotation2d.fromDegrees(90);
   public static final Rotation2d groundAngle = Rotation2d.fromDegrees(0);
@@ -33,11 +33,6 @@ public class Intake extends SubsystemBase {
     this.roller = new Roller(rollerIO);
   }
 
-  public void periodic() {
-    pivot.periodic();
-    roller.periodic();
-  }
-
   // ==================== Pivot Control ====================
 
   /** Set the pivot goal angle */
@@ -48,6 +43,16 @@ public class Intake extends SubsystemBase {
   /** Set the pivot goal angle in radians */
   public void setPivotGoal(DoubleSupplier goalRad) {
     pivot.setGoal(goalRad);
+  }
+
+  /** Set pivot goal and override manual mode output. */
+  public void setPivotGoalOverrideManual(Supplier<Rotation2d> goal) {
+    pivot.setGoalOverrideManual(goal);
+  }
+
+  /** Set pivot goal in radians and override manual mode output. */
+  public void setPivotGoalOverrideManual(DoubleSupplier goalRad) {
+    pivot.setGoalOverrideManual(goalRad);
   }
 
   /** Set pivot to stowed position (90 degrees) */
@@ -108,6 +113,11 @@ public class Intake extends SubsystemBase {
     roller.runIntake();
   }
 
+  /** Run roller at intake velocity and override manual mode output. */
+  public void runIntakeOverrideManual() {
+    roller.runIntakeOverrideManual();
+  }
+
   /** Run roller at eject velocity */
   public void runEject() {
     roller.runEject();
@@ -123,9 +133,19 @@ public class Intake extends SubsystemBase {
     roller.runVelocity(velocityRPS);
   }
 
+  /** Run roller at velocity and override manual mode output. */
+  public void runRollerVelocityOverrideManual(double velocityRPS) {
+    roller.runVelocityOverrideManual(velocityRPS);
+  }
+
   /** Stop the roller */
   public void stopRoller() {
     roller.stop();
+  }
+
+  /** Stop roller and override manual mode output. */
+  public void stopRollerOverrideManual() {
+    roller.stopOverrideManual();
   }
 
   // ==================== Commands ====================

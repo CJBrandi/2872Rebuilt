@@ -37,8 +37,13 @@ class ShooterConfig:
     """Configuration for the shooter trajectory solver."""
 
     # Target parameters
-    target_height: float = 65.825 * 0.0254  # 1.432 m (56 3/8 inches)
+    target_height: float = 65.825 * 0.0254  # 1.672 m (65.825 inches)
     max_entry_angle_deg: float = 30.0  # max allowed angle from vertical at target
+    # Launch pitch constraints (angle above horizontal) for shot profile:
+    # hood_angle = 90° - launch_pitch
+    # mechanism supports up to 74.5°, but we cap the profile at 72.5°.
+    min_launch_pitch_deg: float = 40.0
+    max_launch_pitch_deg: float = 72.5
 
     # Game piece physics (2026 ball)
     ball_mass: float = 0.227  # kg (0.5 lbs)
@@ -47,7 +52,7 @@ class ShooterConfig:
     air_density: float = 1.204  # kg/m³ at sea level
 
     # Shooter configuration
-    shooter_height: float = 21.0 * 0.0254  # 0.508 m (20 inches)
+    shooter_height: float = 21.0 * 0.0254  # 0.533 m (21 inches)
 
     # Optimization parameters
     num_timesteps: int = 50
@@ -65,6 +70,14 @@ class ShooterConfig:
     @property
     def max_entry_angle_rad(self) -> float:
         return math.radians(self.max_entry_angle_deg)
+
+    @property
+    def min_launch_pitch_rad(self) -> float:
+        return math.radians(self.min_launch_pitch_deg)
+
+    @property
+    def max_launch_pitch_rad(self) -> float:
+        return math.radians(self.max_launch_pitch_deg)
 
 
 @dataclass
@@ -164,6 +177,11 @@ def solve_trajectory(
         config = ShooterConfig()
     if not (0.0 < config.max_entry_angle_deg < 90.0):
         raise ValueError("max_entry_angle_deg must be between 0 and 90 degrees (exclusive).")
+    if not (0.0 <= config.min_launch_pitch_deg < config.max_launch_pitch_deg < 90.0):
+        raise ValueError(
+            "launch pitch limits must satisfy 0 <= min_launch_pitch_deg < "
+            "max_launch_pitch_deg < 90."
+        )
 
     # Create dynamics function
     f = _create_dynamics_function(config)
@@ -238,7 +256,25 @@ def solve_trajectory(
     # 2. Final position at target
     problem.subject_to(p[:, -1:] == target_pos)
 
-    # 3. Entry angle constraint at the target point
+    # 3. Launch pitch constraints at release (initial velocity at shooter)
+    horizontal_speed_sq_0 = v_x[0] ** 2 + v_y[0] ** 2
+    vertical_speed_0 = v_z[0]
+
+    # Must launch upward.
+    problem.subject_to(vertical_speed_0 >= 0.0)
+
+    # Launch pitch bounds:
+    # tan(pitch) = vz / sqrt(vx² + vy²)
+    min_launch_ratio = math.tan(config.min_launch_pitch_rad)
+    max_launch_ratio = math.tan(config.max_launch_pitch_rad)
+    problem.subject_to(
+        vertical_speed_0 ** 2 >= horizontal_speed_sq_0 * min_launch_ratio ** 2
+    )
+    problem.subject_to(
+        vertical_speed_0 ** 2 <= horizontal_speed_sq_0 * max_launch_ratio ** 2
+    )
+
+    # 4. Entry angle constraint at the target point
     # Ball must be descending and within max entry angle from vertical.
     horizontal_speed_sq = v_x[-1] ** 2 + v_y[-1] ** 2
     vertical_speed = v_z[-1]
@@ -252,7 +288,7 @@ def solve_trajectory(
         horizontal_speed_sq <= vertical_speed ** 2 * max_horizontal_ratio ** 2
     )
 
-    # 4. Dynamics constraints (RK4 integration)
+    # 5. Dynamics constraints (RK4 integration)
     for k in range(N - 1):
         x_k = X[:, k]
         x_k1 = X[:, k + 1]
@@ -264,7 +300,7 @@ def solve_trajectory(
 
         problem.subject_to(x_k1 == x_k + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4))
 
-    # 5. Height constraint (stay above ground)
+    # 6. Height constraint (stay above ground)
     for k in range(N):
         problem.subject_to(p_z[k] >= 0.0)
 
@@ -306,6 +342,16 @@ def solve_trajectory(
     entry_horizontal = math.hypot(v_final[0, 0], v_final[1, 0])
     entry_vertical = abs(v_final[2, 0])
     entry_angle_rad = math.atan2(entry_horizontal, entry_vertical)
+
+    # Validate constraints from extracted trajectory values. The optimization
+    # enforces these, but we guard against numerical tolerance issues.
+    constraint_tolerance_rad = math.radians(0.05)
+    if entry_angle_rad > config.max_entry_angle_rad + constraint_tolerance_rad:
+        raise RuntimeError(
+            "Entry angle constraint violated: "
+            f"{math.degrees(entry_angle_rad):.3f}° > "
+            f"{config.max_entry_angle_deg:.3f}°."
+        )
 
     # Build result
     result = TrajectoryResult(
@@ -373,11 +419,19 @@ def main():
     )
     parser.add_argument(
         "--shooter-height", type=float, default=None,
-        help="Shooter height in meters (default: 20 inches / 0.508m)"
+        help="Shooter height in meters (default: 21 inches / 0.5334m)"
     )
     parser.add_argument(
         "--entry-angle", type=float, default=None,
-        help="Maximum allowed entry angle from vertical in degrees (default: 30°)"
+        help="Maximum allowed entry angle from vertical in degrees"
+    )
+    parser.add_argument(
+        "--min-launch-pitch", type=float, default=None,
+        help="Minimum launch pitch above horizontal in degrees"
+    )
+    parser.add_argument(
+        "--max-launch-pitch", type=float, default=None,
+        help="Maximum launch pitch above horizontal in degrees"
     )
     parser.add_argument(
         "--test", action="store_true",
@@ -395,6 +449,10 @@ def main():
         config.shooter_height = args.shooter_height
     if args.entry_angle is not None:
         config.max_entry_angle_deg = args.entry_angle
+    if args.min_launch_pitch is not None:
+        config.min_launch_pitch_deg = args.min_launch_pitch
+    if args.max_launch_pitch is not None:
+        config.max_launch_pitch_deg = args.max_launch_pitch
 
     # Test mode
     if args.test or (args.horizontal is None and args.vertical is None):
@@ -402,7 +460,8 @@ def main():
         print()
         print(f"Config: target_height={config.target_height:.3f}m, "
               f"shooter_height={config.shooter_height:.3f}m, "
-              f"max_entry_angle={config.max_entry_angle_deg}°")
+              f"max_entry_angle={config.max_entry_angle_deg}°, "
+              f"launch_pitch=[{config.min_launch_pitch_deg}°, {config.max_launch_pitch_deg}°]")
         print()
 
         for dist in [1.0, 2.0, 3.0, 4.0, 5.0]:

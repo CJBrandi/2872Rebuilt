@@ -61,7 +61,7 @@ public class Indexer {
         maxVelocityRadPerSec.initDefault(200.0);
         maxAccelerationRadPerSec2.initDefault(400.0);
         staticCharacterizationVelocityThresh.initDefault(0.1);
-        auxIndexerRunVelocityRPM.initDefault(2000);
+        auxIndexerRunVelocityRPM.initDefault(750);
         auxIndexerKp.initDefault(0.0001);
         auxIndexerKi.initDefault(0.0);
         auxIndexerKd.initDefault(0.0);

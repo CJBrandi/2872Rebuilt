@@ -33,10 +33,10 @@ public class Turret {
       new LoggedTunableNumber("Turret/HallBandWidthDeg");
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Turret/StaticCharacterizationVelocityThreshRadPerSec");
-  private static final LoggedTunableNumber extraLimitDegrees =
-      new LoggedTunableNumber("Turret/ExtraLimitDegrees");
-
-  private static final double BASE_LIMIT_DEGREES = 180.0;
+  private static final LoggedTunableNumber minLimitDegrees =
+      new LoggedTunableNumber("Turret/MinLimitDegrees");
+  private static final LoggedTunableNumber maxLimitDegrees =
+      new LoggedTunableNumber("Turret/MaxLimitDegrees");
   private static final double STATIC_CHARACTERIZATION_MAX_CURRENT_AMPS = 10.0;
 
   // Manual mode tunables
@@ -69,7 +69,8 @@ public class Turret {
     homingVolts.initDefault(0.2);
     hallBandWidthDeg.initDefault(36.5);
     staticCharacterizationVelocityThresh.initDefault(0.1);
-    extraLimitDegrees.initDefault(5.0);
+    minLimitDegrees.initDefault(-185.0);
+    maxLimitDegrees.initDefault(185.0);
     disableHoming.initDefault(1.0);
     manualModeEnabled.initDefault(0.0);
     manualAngleDeg.initDefault(0.0);
@@ -197,10 +198,7 @@ public class Turret {
       turretIO.runPosition(Rotation2d.fromRadians(setpoint.position), feedforward);
 
       // Check if at goal
-      atGoal =
-          EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(1.0))
-              && EqualsUtil.epsilonEquals(
-                  setpoint.velocity, robotRelativeGoalVelocity, Units.degreesToRadians(10.0));
+      atGoal = EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(5.0));
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", robotRelativeGoalVelocity);
@@ -217,10 +215,7 @@ public class Turret {
 
       turretIO.runPosition(Rotation2d.fromRadians(setpoint.position), feedforward);
 
-      atGoal =
-          EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(1.0))
-              && EqualsUtil.epsilonEquals(
-                  setpoint.velocity, targetVelocityRadPerSec, Units.degreesToRadians(10.0));
+      atGoal = EqualsUtil.epsilonEquals(setpoint.position, bestAngle, Units.degreesToRadians(2.0));
 
       Logger.recordOutput("Turret/GoalAngleRad", bestAngle);
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", targetVelocityRadPerSec);
@@ -234,23 +229,21 @@ public class Turret {
     TurretVisualizer.update(setpoint.position);
   }
 
-  /**
-   * Finds the best turret angle among equivalent wraps while enforcing the symmetric limit ±(180 +
-   * X) degrees, where X is tunable as Turret/ExtraLimitDegrees.
-   */
+  /** Finds the best turret angle among equivalent wraps while enforcing software min/max limits. */
   private double findBestAngleWithinLimits(double robotRelativeGoalRad) {
     double requestedDeg = Units.radiansToDegrees(robotRelativeGoalRad);
     double principalDeg = MathUtil.inputModulus(requestedDeg, -180.0, 180.0);
     double referenceDeg = Units.radiansToDegrees(lastGoalAngle);
-    double maxAbsDeg = getMaxAbsAngleDeg();
+    double minDeg = getMinLimitDeg();
+    double maxDeg = getMaxLimitDeg();
 
     double bestDeg = Double.NaN;
     double bestDistance = Double.POSITIVE_INFINITY;
 
-    // Check equivalent wraps and keep only legal candidates inside +/- maxAbsDeg
+    // Check equivalent wraps and keep only legal candidates inside [minDeg, maxDeg]
     for (int i = -2; i <= 2; i++) {
       double candidateDeg = principalDeg + 360.0 * i;
-      if (Math.abs(candidateDeg) <= maxAbsDeg) {
+      if (candidateDeg >= minDeg && candidateDeg <= maxDeg) {
         double distance = Math.abs(candidateDeg - referenceDeg);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -262,7 +255,7 @@ public class Turret {
     boolean usedFallbackClamp = false;
     if (Double.isNaN(bestDeg)) {
       // Should be rare for this mechanism; keep command legal even in edge cases
-      bestDeg = MathUtil.clamp(principalDeg, -maxAbsDeg, maxAbsDeg);
+      bestDeg = MathUtil.clamp(principalDeg, minDeg, maxDeg);
       usedFallbackClamp = true;
     }
 
@@ -270,7 +263,8 @@ public class Turret {
     Logger.recordOutput("Turret/Safety/PrincipalAngleDeg", principalDeg);
     Logger.recordOutput("Turret/Safety/ReferenceAngleDeg", referenceDeg);
     Logger.recordOutput("Turret/Safety/SelectedAngleDeg", bestDeg);
-    Logger.recordOutput("Turret/Safety/MaxAbsAngleDeg", maxAbsDeg);
+    Logger.recordOutput("Turret/Safety/MinLimitDeg", minDeg);
+    Logger.recordOutput("Turret/Safety/MaxLimitDeg", maxDeg);
     Logger.recordOutput("Turret/Safety/FallbackClampUsed", usedFallbackClamp);
 
     return Units.degreesToRadians(bestDeg);
@@ -287,19 +281,27 @@ public class Turret {
 
     double velocity = state.velocity;
     // If clamped at a hard limit and velocity is pushing farther out, zero velocity.
-    if (Math.signum(clampedPosition) == Math.signum(velocity)) {
+    double minRad = Units.degreesToRadians(getMinLimitDeg());
+    double maxRad = Units.degreesToRadians(getMaxLimitDeg());
+    if ((Math.abs(clampedPosition - minRad) < 1e-9 && velocity < 0.0)
+        || (Math.abs(clampedPosition - maxRad) < 1e-9 && velocity > 0.0)) {
       velocity = 0.0;
     }
     return new TrapezoidProfile.State(clampedPosition, velocity);
   }
 
-  private double getMaxAbsAngleDeg() {
-    return BASE_LIMIT_DEGREES + Math.max(0.0, extraLimitDegrees.get());
+  private double getMinLimitDeg() {
+    return Math.min(minLimitDegrees.get(), maxLimitDegrees.get());
+  }
+
+  private double getMaxLimitDeg() {
+    return Math.max(minLimitDegrees.get(), maxLimitDegrees.get());
   }
 
   private double clampToLimitsRad(double angleRad) {
-    double maxAbsRad = Units.degreesToRadians(getMaxAbsAngleDeg());
-    return MathUtil.clamp(angleRad, -maxAbsRad, maxAbsRad);
+    double minRad = Units.degreesToRadians(getMinLimitDeg());
+    double maxRad = Units.degreesToRadians(getMaxLimitDeg());
+    return MathUtil.clamp(angleRad, minRad, maxRad);
   }
 
   private void logState() {
@@ -320,7 +322,8 @@ public class Turret {
     Logger.recordOutput("Turret/ActualVelocityRadPerSec", inputs.velocityRadPerSec);
     Logger.recordOutput("Turret/FieldRelativeAngleDeg", getFieldRelativeAngle().getDegrees());
     Logger.recordOutput("Turret/LastGoalAngleDeg", Units.radiansToDegrees(lastGoalAngle));
-    Logger.recordOutput("Turret/Safety/ExtraLimitDeg", Math.max(0.0, extraLimitDegrees.get()));
+    Logger.recordOutput("Turret/Safety/MinLimitDeg", getMinLimitDeg());
+    Logger.recordOutput("Turret/Safety/MaxLimitDeg", getMaxLimitDeg());
   }
 
   /**

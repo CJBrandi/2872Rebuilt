@@ -11,6 +11,8 @@
     "target_height_m": 1.671955,
     "shooter_height_m": 0.5334,
     "max_entry_angle_deg": 30.0,
+    "min_launch_pitch_deg": 40.0,
+    "max_launch_pitch_deg": 72.5,
     "ball_mass_kg": 0.227,
     "ball_diameter_m": 0.15062199999999998,
     "drag_coefficient": 0.47,
@@ -25,7 +27,7 @@
     {
       "distance": 1.5,
       "velocity_vector_mps": {
-        "x": 1.7941,
+        "x": 1.79408,
         "y": 0.0,
         "z": 5.678
       },
@@ -36,20 +38,20 @@
     {
       "distance": 1.6,
       "velocity_vector_mps": {
-        "x": 1.8742,
+        "x": 1.82634,
         "y": 0.0,
-        "z": 5.7495
+        "z": 5.7924
       },
-      "speed_mps": 6.0473,
-      "pitch_rad": 1.255682,
-      "flight_time": 0.9029
+      "speed_mps": 6.0735,
+      "pitch_rad": 1.265363,
+      "flight_time": 0.9044
     },
     {
       "distance": 1.7,
       "velocity_vector_mps": {
-        "x": 1.9522,
+        "x": 1.95222,
         "y": 0.0,
-        "z": 5.8208
+        "z": 5.82085
       },
       "speed_mps": 6.1395,
       "pitch_rad": 1.247201,
@@ -58,20 +60,20 @@
     {
       "distance": 1.8,
       "velocity_vector_mps": {
-        "x": 2.0283,
+        "x": 1.92476,
         "y": 0.0,
-        "z": 5.8918
+        "z": 6.10455
       },
-      "speed_mps": 6.2312,
-      "pitch_rad": 1.239248,
-      "flight_time": 0.9413
+      "speed_mps": 6.4008,
+      "pitch_rad": 1.265363,
+      "flight_time": 0.9644
     },
     {
       "distance": 1.9,
       "velocity_vector_mps": {
-        "x": 2.1026,
+        "x": 2.10258,
         "y": 0.0,
-        "z": 5.9624
+        "z": 5.96243
       },
       "speed_mps": 6.3223,
       "pitch_rad": 1.231773,
@@ -80,9 +82,9 @@
     {
       "distance": 2.0,
       "velocity_vector_mps": {
-        "x": 2.1752,
+        "x": 2.17523,
         "y": 0.0,
-        "z": 6.0326
+        "z": 6.03261
       },
       "speed_mps": 6.4128,
       "pitch_rad": 1.224729,
@@ -91,9 +93,9 @@
     {
       "distance": 2.1,
       "velocity_vector_mps": {
-        "x": 2.2464,
+        "x": 2.24637,
         "y": 0.0,
-        "z": 6.1024
+        "z": 6.10237
       },
       "speed_mps": 6.5027,
       "pitch_rad": 1.218076,
@@ -102,9 +104,9 @@
     {
       "distance": 2.2,
       "velocity_vector_mps": {
-        "x": 2.3161,
+        "x": 2.31609,
         "y": 0.0,
-        "z": 6.1716
+        "z": 6.17162
       },
       "speed_mps": 6.5919,
       "pitch_rad": 1.211779,
@@ -113,9 +115,9 @@
     {
       "distance": 2.3,
       "velocity_vector_mps": {
-        "x": 2.3846,
+        "x": 2.38457,
         "y": 0.0,
-        "z": 6.2405
+        "z": 6.24053
       },
       "speed_mps": 6.6806,
       "pitch_rad": 1.205807,
@@ -124,9 +126,9 @@
     {
       "distance": 2.4,
       "velocity_vector_mps": {
-        "x": 2.4518,
+        "x": 2.45179,
         "y": 0.0,
-        "z": 6.3088
+        "z": 6.30883
       },
       "speed_mps": 6.7685,
       "pitch_rad": 1.200132,
@@ -135,9 +137,9 @@
     {
       "distance": 2.5,
       "velocity_vector_mps": {
-        "x": 2.5179,
+        "x": 2.51794,
         "y": 0.0,
-        "z": 6.3768
+        "z": 6.37678
       },
       "speed_mps": 6.8559,
       "pitch_rad": 1.194729,
@@ -146,9 +148,9 @@
     {
       "distance": 2.6,
       "velocity_vector_mps": {
-        "x": 2.583,
+        "x": 2.58297,
         "y": 0.0,
-        "z": 6.4441
+        "z": 6.44411
       },
       "speed_mps": 6.9425,
       "pitch_rad": 1.189577,
@@ -157,9 +159,9 @@
     {
       "distance": 2.7,
       "velocity_vector_mps": {
-        "x": 2.6471,
+        "x": 2.64709,
         "y": 0.0,
-        "z": 6.5111
+        "z": 6.51108
       },
       "speed_mps": 7.0286,
       "pitch_rad": 1.184654,
@@ -168,7 +170,7 @@
     {
       "distance": 2.8,
       "velocity_vector_mps": {
-        "x": 2.7103,
+        "x": 2.71026,
         "y": 0.0,
         "z": 6.5775
       },
@@ -179,9 +181,9 @@
     {
       "distance": 2.9,
       "velocity_vector_mps": {
-        "x": 2.7726,
+        "x": 2.77258,
         "y": 0.0,
-        "z": 6.6435
+        "z": 6.64346
       },
       "speed_mps": 7.1988,
       "pitch_rad": 1.175432,
@@ -190,9 +192,9 @@
     {
       "distance": 3.0,
       "velocity_vector_mps": {
-        "x": 2.8341,
+        "x": 2.83408,
         "y": 0.0,
-        "z": 6.709
+        "z": 6.70895
       },
       "speed_mps": 7.283,
       "pitch_rad": 1.171102,
@@ -201,9 +203,9 @@
     {
       "distance": 3.1,
       "velocity_vector_mps": {
-        "x": 2.8948,
+        "x": 2.89479,
         "y": 0.0,
-        "z": 6.7739
+        "z": 6.77389
       },
       "speed_mps": 7.3665,
       "pitch_rad": 1.166941,
@@ -214,7 +216,7 @@
       "velocity_vector_mps": {
         "x": 2.9548,
         "y": 0.0,
-        "z": 6.8384
+        "z": 6.83844
       },
       "speed_mps": 7.4495,
       "pitch_rad": 1.162938,
@@ -223,7 +225,7 @@
     {
       "distance": 3.3,
       "velocity_vector_mps": {
-        "x": 3.0141,
+        "x": 3.01413,
         "y": 0.0,
         "z": 6.9025
       },
@@ -236,7 +238,7 @@
       "velocity_vector_mps": {
         "x": 3.0728,
         "y": 0.0,
-        "z": 6.9661
+        "z": 6.96608
       },
       "speed_mps": 7.6137,
       "pitch_rad": 1.155361,
@@ -245,9 +247,9 @@
     {
       "distance": 3.5,
       "velocity_vector_mps": {
-        "x": 3.1309,
+        "x": 3.13088,
         "y": 0.0,
-        "z": 7.0293
+        "z": 7.02927
       },
       "speed_mps": 7.695,
       "pitch_rad": 1.151769,
@@ -256,9 +258,9 @@
     {
       "distance": 3.6,
       "velocity_vector_mps": {
-        "x": 3.1884,
+        "x": 3.18837,
         "y": 0.0,
-        "z": 7.092
+        "z": 7.09196
       },
       "speed_mps": 7.7757,
       "pitch_rad": 1.148296,
@@ -267,9 +269,9 @@
     {
       "distance": 3.7,
       "velocity_vector_mps": {
-        "x": 3.2453,
+        "x": 3.24527,
         "y": 0.0,
-        "z": 7.1541
+        "z": 7.15415
       },
       "speed_mps": 7.8558,
       "pitch_rad": 1.144936,
@@ -280,7 +282,7 @@
       "velocity_vector_mps": {
         "x": 3.3017,
         "y": 0.0,
-        "z": 7.216
+        "z": 7.21602
       },
       "speed_mps": 7.9355,
       "pitch_rad": 1.141681,
@@ -289,9 +291,9 @@
     {
       "distance": 3.9,
       "velocity_vector_mps": {
-        "x": 3.3576,
+        "x": 3.35759,
         "y": 0.0,
-        "z": 7.2774
+        "z": 7.27739
       },
       "speed_mps": 8.0146,
       "pitch_rad": 1.138525,
@@ -300,9 +302,9 @@
     {
       "distance": 4.0,
       "velocity_vector_mps": {
-        "x": 3.413,
+        "x": 3.41301,
         "y": 0.0,
-        "z": 7.3383
+        "z": 7.33834
       },
       "speed_mps": 8.0932,
       "pitch_rad": 1.135462,
@@ -311,9 +313,9 @@
     {
       "distance": 4.1,
       "velocity_vector_mps": {
-        "x": 3.468,
+        "x": 3.46802,
         "y": 0.0,
-        "z": 7.399
+        "z": 7.39896
       },
       "speed_mps": 8.1714,
       "pitch_rad": 1.132486,
@@ -322,9 +324,9 @@
     {
       "distance": 4.2,
       "velocity_vector_mps": {
-        "x": 3.5226,
+        "x": 3.52255,
         "y": 0.0,
-        "z": 7.4591
+        "z": 7.45906
       },
       "speed_mps": 8.249,
       "pitch_rad": 1.129593,
@@ -333,9 +335,9 @@
     {
       "distance": 4.3,
       "velocity_vector_mps": {
-        "x": 3.5767,
+        "x": 3.57669,
         "y": 0.0,
-        "z": 7.5188
+        "z": 7.51884
       },
       "speed_mps": 8.3262,
       "pitch_rad": 1.126779,
@@ -344,9 +346,9 @@
     {
       "distance": 4.4,
       "velocity_vector_mps": {
-        "x": 3.6305,
+        "x": 3.63048,
         "y": 0.0,
-        "z": 7.5783
+        "z": 7.57826
       },
       "speed_mps": 8.403,
       "pitch_rad": 1.124037,
@@ -355,9 +357,9 @@
     {
       "distance": 4.5,
       "velocity_vector_mps": {
-        "x": 3.6839,
+        "x": 3.68385,
         "y": 0.0,
-        "z": 7.6373
+        "z": 7.63726
       },
       "speed_mps": 8.4793,
       "pitch_rad": 1.121366,
@@ -366,9 +368,9 @@
     {
       "distance": 4.6,
       "velocity_vector_mps": {
-        "x": 3.7368,
+        "x": 3.73684,
         "y": 0.0,
-        "z": 7.6958
+        "z": 7.69583
       },
       "speed_mps": 8.5551,
       "pitch_rad": 1.118761,
@@ -377,9 +379,9 @@
     {
       "distance": 4.7,
       "velocity_vector_mps": {
-        "x": 3.7896,
+        "x": 3.78955,
         "y": 0.0,
-        "z": 7.7541
+        "z": 7.75413
       },
       "speed_mps": 8.6306,
       "pitch_rad": 1.116218,
@@ -388,7 +390,7 @@
     {
       "distance": 4.8,
       "velocity_vector_mps": {
-        "x": 3.8419,
+        "x": 3.84189,
         "y": 0.0,
         "z": 7.812
       },
@@ -399,9 +401,9 @@
     {
       "distance": 4.9,
       "velocity_vector_mps": {
-        "x": 3.8939,
+        "x": 3.89393,
         "y": 0.0,
-        "z": 7.8695
+        "z": 7.86951
       },
       "speed_mps": 8.7802,
       "pitch_rad": 1.111308,
@@ -410,9 +412,9 @@
     {
       "distance": 5.0,
       "velocity_vector_mps": {
-        "x": 3.9457,
+        "x": 3.94566,
         "y": 0.0,
-        "z": 7.9267
+        "z": 7.92667
       },
       "speed_mps": 8.8544,
       "pitch_rad": 1.108934,
@@ -423,7 +425,7 @@
       "velocity_vector_mps": {
         "x": 3.9971,
         "y": 0.0,
-        "z": 7.9835
+        "z": 7.98348
       },
       "speed_mps": 8.9282,
       "pitch_rad": 1.106612,
@@ -432,9 +434,9 @@
     {
       "distance": 5.2,
       "velocity_vector_mps": {
-        "x": 4.0483,
+        "x": 4.04825,
         "y": 0.0,
-        "z": 8.0399
+        "z": 8.03993
       },
       "speed_mps": 9.0016,
       "pitch_rad": 1.104338,
@@ -443,9 +445,9 @@
     {
       "distance": 5.3,
       "velocity_vector_mps": {
-        "x": 4.0992,
+        "x": 4.09917,
         "y": 0.0,
-        "z": 8.0961
+        "z": 8.09611
       },
       "speed_mps": 9.0747,
       "pitch_rad": 1.102111,
@@ -454,9 +456,9 @@
     {
       "distance": 5.4,
       "velocity_vector_mps": {
-        "x": 4.1498,
+        "x": 4.14982,
         "y": 0.0,
-        "z": 8.1519
+        "z": 8.15193
       },
       "speed_mps": 9.1474,
       "pitch_rad": 1.099927,
@@ -465,9 +467,9 @@
     {
       "distance": 5.5,
       "velocity_vector_mps": {
-        "x": 4.2002,
+        "x": 4.20025,
         "y": 0.0,
-        "z": 8.2075
+        "z": 8.20747
       },
       "speed_mps": 9.2198,
       "pitch_rad": 1.097786,
@@ -476,9 +478,9 @@
     {
       "distance": 5.6,
       "velocity_vector_mps": {
-        "x": 4.2504,
+        "x": 4.25043,
         "y": 0.0,
-        "z": 8.2627
+        "z": 8.26265
       },
       "speed_mps": 9.2918,
       "pitch_rad": 1.095684,
@@ -487,9 +489,9 @@
     {
       "distance": 5.7,
       "velocity_vector_mps": {
-        "x": 4.3003,
+        "x": 4.30035,
         "y": 0.0,
-        "z": 8.3175
+        "z": 8.31747
       },
       "speed_mps": 9.3634,
       "pitch_rad": 1.093621,
@@ -498,7 +500,7 @@
     {
       "distance": 5.8,
       "velocity_vector_mps": {
-        "x": 4.3501,
+        "x": 4.35011,
         "y": 0.0,
         "z": 8.3721
       },
@@ -509,9 +511,9 @@
     {
       "distance": 5.9,
       "velocity_vector_mps": {
-        "x": 4.3996,
+        "x": 4.39963,
         "y": 0.0,
-        "z": 8.4264
+        "z": 8.42636
       },
       "speed_mps": 9.5058,
       "pitch_rad": 1.089604,
@@ -520,9 +522,9 @@
     {
       "distance": 6.0,
       "velocity_vector_mps": {
-        "x": 4.449,
+        "x": 4.44897,
         "y": 0.0,
-        "z": 8.4803
+        "z": 8.48033
       },
       "speed_mps": 9.5765,
       "pitch_rad": 1.087646,
