@@ -22,6 +22,8 @@ public class RobotState {
   @Getter private Translation2d bestFuelCluster = new Translation2d();
   @Getter private boolean hasBestFuelCluster = false;
 
+  @Getter @Setter private boolean autoEmpty = false;
+
   // Turret angle buffer for vision pose estimation
   private final NavigableMap<Double, Rotation2d> turretAngleBuffer = new TreeMap<>();
   @Getter private Rotation2d latestTurretAngle = new Rotation2d();
@@ -70,6 +72,7 @@ public class RobotState {
     // Calculate horizontal distance from robot to HUB
     Translation3d hubCenter = FieldConstants.Hub.topCenterPoint.get();
     double horizontalDistance = robotPose.getTranslation().getDistance(hubCenter.toTranslation2d());
+    Logger.recordOutput("RobotState/AutoEmpty", autoEmpty);
     Logger.recordOutput("RobotState/HubDistanceMeters", horizontalDistance);
     Logger.recordOutput("RobotState/FuelPickup/HasBestCluster", hasBestFuelCluster);
     Logger.recordOutput("RobotState/FuelPickup/BestCluster", bestFuelCluster);

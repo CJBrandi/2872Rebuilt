@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.RobotState;
@@ -53,7 +54,10 @@ public class Superstructure extends SubsystemBase {
       if (trenchStowActive) {
         shooter.setGoals(params.exitVelocity(), TRENCH_STOW_PITCH_RAD, 0.0);
       } else {
-        shooter.setGoals(params.exitVelocity(), params.pitchAngle(), params.pitchVelocity());
+        shooter.setGoals(
+            params.exitVelocity(),
+            params.pitchAngle() + Units.degreesToRadians(0.5),
+            params.pitchVelocity());
       }
       turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
 
@@ -73,7 +77,8 @@ public class Superstructure extends SubsystemBase {
 
   @AutoLogOutput(key = "Superstructure/ReadyToShoot")
   public boolean isReadyToShoot() {
-    return !trenchStowActive
+    return RobotState.getInstance().isAutoEmpty()
+        && !trenchStowActive
         && shooter.isReady()
         && turret.isAtGoal()
         && shotCalculator.isShotStable();

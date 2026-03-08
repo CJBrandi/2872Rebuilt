@@ -154,17 +154,6 @@ public class PivotIOTalonFX implements PivotIO {
   }
 
   @Override
-  public void setBrakeMode(boolean enabled) {
-    new Thread(
-            () -> {
-              Config.MotorOutput.NeutralMode =
-                  enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-              tryUntilOk(5, () -> talon.getConfigurator().apply(Config));
-            })
-        .start();
-  }
-
-  @Override
   public void setPosition(double degrees) {
     talon.setPosition(degrees);
   }

@@ -87,7 +87,7 @@ public class Pivot extends SubsystemBase {
 
   private TrapezoidProfile profile;
   @Getter private State setpoint = new State();
-  private DoubleSupplier goal = () -> Intake.stowedAngle.getRadians();
+  private DoubleSupplier goal = Intake.groundAngle::getRadians;
   private boolean profileInitialized = false;
   private boolean stopProfile = false;
   @Getter private boolean shouldEStop = false;
@@ -98,7 +98,7 @@ public class Pivot extends SubsystemBase {
   private boolean atGoal = false;
 
   // Homed state is explicit and can be controlled directly.
-  @Getter @Setter private boolean homed = false;
+  @Getter @Setter private boolean homed = true;
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
 
   // Disconnected alerts
@@ -156,13 +156,7 @@ public class Pivot extends SubsystemBase {
     // Run profile
     boolean manualMode = manualModeEnabled.get() > 0.5;
 
-    final boolean shouldRunProfile =
-        !stopProfile
-            && !coastOverride.getAsBoolean()
-            && !disabledOverride.getAsBoolean()
-            && homed
-            && !isEStopped
-            && DriverStation.isEnabled();
+    final boolean shouldRunProfile = !stopProfile && !isEStopped && DriverStation.isEnabled();
     Logger.recordOutput("Intake/Pivot/RunningProfile", shouldRunProfile);
 
     // Check if out of tolerance

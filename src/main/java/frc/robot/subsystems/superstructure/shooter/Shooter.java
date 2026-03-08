@@ -15,9 +15,9 @@ public class Shooter {
   private static final LoggedTunableNumber manualModeEnabled =
       new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber manualFlywheelRPM =
-      new LoggedTunableNumber("Manual/FlywheelRPM", 3000.0);
+      new LoggedTunableNumber("Manual/FlywheelRPM", 0.0);
   private static final LoggedTunableNumber manualHoodAngleDeg =
-      new LoggedTunableNumber("Manual/PitchDeg", 45.0);
+      new LoggedTunableNumber("Manual/PitchDeg", 25.0);
 
   private final Flywheel flywheel;
   private final Hood hood;

@@ -11,7 +11,6 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Filesystem;
 import frc.robot.RobotState;
 import java.io.BufferedReader;
@@ -57,7 +56,7 @@ public class ShotCalculator {
 
   private static ShotCalculator instance;
 
-  private enum ShotMode {
+  enum ShotMode {
     HUB,
     LOB_LEFT,
     LOB_RIGHT
@@ -236,7 +235,8 @@ public class ShotCalculator {
     Rotation2d lookupYaw =
         normalizeTo0To2Pi(
             targetPosition.minus(compensationSolution.compensatedPosition()).getAngle());
-    Translation3d lookupVector = getLookupVector(compensationSolution.lookaheadDistance(), lookupProfile);
+    Translation3d lookupVector =
+        getLookupVector(compensationSolution.lookaheadDistance(), lookupProfile);
     Translation3d requiredFieldVelocity =
         ShotVectorCompensator.orientLookupVectorToField(lookupVector, lookupYaw);
     double tof = lookupProfile.flightTimeMap.get(compensationSolution.lookaheadDistance());
@@ -281,7 +281,8 @@ public class ShotCalculator {
     Logger.recordOutput("ShotCalculator/SelectionRobotX", robotPose.getX());
     Logger.recordOutput("ShotCalculator/SelectionRobotY", robotPose.getY());
     Logger.recordOutput(
-        "ShotCalculator/TargetPosition", new double[] {targetPosition.getX(), targetPosition.getY()});
+        "ShotCalculator/TargetPosition",
+        new double[] {targetPosition.getX(), targetPosition.getY()});
     Logger.recordOutput(
         "ShotCalculator/CompensatedPosition",
         new Pose2d(compensationSolution.compensatedPosition(), turretAngle));
@@ -326,22 +327,48 @@ public class ShotCalculator {
   }
 
   private ShotSelection selectShotSelection(Pose2d robotPose) {
-    if (robotPose.getX() < HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS) {
-      return new ShotSelection(
-          ShotMode.HUB, hubLookupProfile, getAllianceTransposedTargetPosition(FieldConstants.Hub.topCenterPoint));
-    }
+    boolean flipFieldCoordinates = AllianceFlipUtil.shouldFlip();
+    Logger.recordOutput("ShotCalculator/Alliance", flipFieldCoordinates ? "Red" : "Blue");
 
-    if (robotPose.getY() > LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS) {
-      return new ShotSelection(
-          ShotMode.LOB_LEFT,
+    ShotMode shotMode = selectShotMode(robotPose, flipFieldCoordinates);
+    return switch (shotMode) {
+      case HUB -> new ShotSelection(
+          ShotMode.HUB,
+          hubLookupProfile,
+          FieldConstants.Hub.topCenterPoint.get().toTranslation2d());
+      case LOB_LEFT -> new ShotSelection(
+          ShotMode.LOB_LEFT, lobLookupProfile, FieldConstants.Lob.LOB_LEFT.get().toTranslation2d());
+      case LOB_RIGHT -> new ShotSelection(
+          ShotMode.LOB_RIGHT,
           lobLookupProfile,
-          getAllianceTransposedTargetPosition(FieldConstants.Lob.LOB_LEFT));
+          FieldConstants.Lob.LOB_RIGHT.get().toTranslation2d());
+    };
+  }
+
+  static ShotMode selectShotMode(Pose2d robotPose, boolean flipFieldCoordinates) {
+    Translation2d selectionPosition =
+        normalizeRobotPositionForShotSelection(robotPose, flipFieldCoordinates);
+
+    if (selectionPosition.getX() < HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS) {
+      return ShotMode.HUB;
     }
 
-    return new ShotSelection(
-        ShotMode.LOB_RIGHT,
-        lobLookupProfile,
-        getAllianceTransposedTargetPosition(FieldConstants.Lob.LOB_RIGHT));
+    if (selectionPosition.getY() > LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS) {
+      return ShotMode.LOB_LEFT;
+    }
+
+    return ShotMode.LOB_RIGHT;
+  }
+
+  private static Translation2d normalizeRobotPositionForShotSelection(
+      Pose2d robotPose, boolean flipFieldCoordinates) {
+    if (!flipFieldCoordinates) {
+      return robotPose.getTranslation();
+    }
+
+    return new Translation2d(
+        FieldConstants.fieldLength - robotPose.getX(),
+        FieldConstants.fieldWidth - robotPose.getY());
   }
 
   private boolean evaluateStabilityGate(
@@ -425,19 +452,6 @@ public class ShotCalculator {
         lookupProfile.velocityVectorXMap.get(distance),
         lookupProfile.velocityVectorYMap.get(distance),
         lookupProfile.velocityVectorZMap.get(distance));
-  }
-
-  /** Returns target position transposed for the current alliance (blue or red). */
-  private Translation2d getAllianceTransposedTargetPosition(
-      FieldConstants.FlippableTranslation3d targetPoint) {
-    if (DriverStation.getAlliance().isPresent()
-        && DriverStation.getAlliance().get() == DriverStation.Alliance.Red) {
-      Logger.recordOutput("ShotCalculator/Alliance", "Red");
-      return targetPoint.getRed().toTranslation2d();
-    }
-
-    Logger.recordOutput("ShotCalculator/Alliance", "Blue");
-    return targetPoint.getBlue().toTranslation2d();
   }
 
   private static Rotation2d normalizeTo0To2Pi(Rotation2d angle) {

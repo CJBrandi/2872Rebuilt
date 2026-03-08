@@ -31,7 +31,13 @@ public class VisionConstants {
 
   public static final TagCameraConfig camera1Config =
       TagCameraConfig.fixed(
-          "camera_1", new Transform3d(-0.2, 0.0, 0.2, new Rotation3d(0.0, -0.4, Math.PI)), 1.0);
+          "camera_1",
+          new Transform3d(
+              Units.inchesToMeters(-13.426), // 13.426
+              Units.inchesToMeters(-5.957), // 5.957
+              Units.inchesToMeters(16.421), // 16.421
+              new Rotation3d(0.0, Units.degreesToRadians(-15), Units.degreesToRadians(45))),
+          1.0);
 
   public static final TagCameraConfig[] tagCameraConfigs =
       new TagCameraConfig[] {camera0Config, camera1Config};

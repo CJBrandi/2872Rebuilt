@@ -24,6 +24,10 @@ import frc.robot.Constants;
 
 /** Turret IO implementation using TalonFX (Kraken X60). */
 public class TurretIOTalonFX implements TurretIO {
+
+  static final double MIN_ANGLE_DEG = Constants.SuperstructureConstants.TurretConstants.minAngleDeg;
+  static final double MAX_ANGLE_DEG = Constants.SuperstructureConstants.TurretConstants.maxAngleDeg;
+
   private static final double GEAR_RATIO =
       Constants.SuperstructureConstants.TurretConstants.reduction;
 
@@ -77,9 +81,10 @@ public class TurretIOTalonFX implements TurretIO {
     config.Slot0.kS = 0.0;
     config.Slot0.kV = 0.0;
 
-    // Disable soft limits - turret uses continuous rotation with wrap-around logic
-    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
-    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
+    config.SoftwareLimitSwitch.ForwardSoftLimitThreshold = Units.degreesToRotations(MAX_ANGLE_DEG);
+    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
+    config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = Units.degreesToRotations(MIN_ANGLE_DEG);
+    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 

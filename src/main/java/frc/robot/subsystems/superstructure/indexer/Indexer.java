@@ -63,7 +63,7 @@ public class Indexer {
         staticCharacterizationVelocityThresh.initDefault(0.1);
       }
     }
-    intakeRPM.initDefault(20.0);
+    intakeRPM.initDefault(70.0);
   }
 
   private final IndexerIO io;

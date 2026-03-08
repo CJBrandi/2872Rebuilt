@@ -59,8 +59,6 @@ public class RobotContainer {
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
-  // Shooting toggle state
-  private boolean continuousShootingEnabled = false;
   private static final double SHOT_PERIOD_SECONDS = 1.0 / 15.0; // 15 balls/second
   private double lastShotTime = 0.0;
 
@@ -115,7 +113,11 @@ public class RobotContainer {
                 new RollerIOTalonFX(
                     Constants.IntakeConstants.RollerConstants.canId,
                     Constants.IntakeConstants.canBus));
-        tag = new Tag(drive::addVisionMeasurement, new TagIOPhotonVision(runtimeCamera0Config));
+        tag =
+            new Tag(
+                drive::addVisionMeasurement,
+                new TagIOPhotonVision(runtimeCamera0Config),
+                new TagIOPhotonVision(runtimeCamera1Config));
         /*
         detection =
             new Detection(
@@ -227,11 +229,10 @@ public class RobotContainer {
       // Spawn starting fuel and start simulation
       fuelSim.spawnStartingFuel();
       fuelSim.start();
-
       superstructure.setDefaultCommand(
           Commands.run(
               () -> {
-                if (continuousShootingEnabled) {
+                if (superstructure.isReadyToShoot()) {
                   double currentTime = Timer.getFPGATimestamp();
                   if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
                     superstructure.launchFuelSim();
@@ -240,14 +241,6 @@ public class RobotContainer {
                 }
               },
               superstructure));
-
-      controller
-          .button(4)
-          .onTrue(
-              Commands.runOnce(
-                  () -> {
-                    continuousShootingEnabled = !continuousShootingEnabled;
-                  }));
     }
 
     // Set up auto routines
@@ -339,6 +332,15 @@ public class RobotContainer {
 
     controller.povUp().onTrue(Commands.runOnce(intake::stow, intake));
     controller.povDown().onTrue(Commands.runOnce(intake::deploy, intake));
+
+    controller
+        .leftBumper()
+        .onTrue(
+            Commands.runOnce(
+                    () ->
+                        RobotState.getInstance()
+                            .setAutoEmpty(!RobotState.getInstance().isAutoEmpty()))
+                .ignoringDisable(true));
   }
 
   /**

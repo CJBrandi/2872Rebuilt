@@ -34,6 +34,7 @@ public class Tag extends SubsystemBase {
   private final TagIOInputsAutoLogged[] inputs;
   private final Alert[] disconnectedAlerts;
   private final LoggedTunableNumber[] poseEstimationEnabledTunables;
+  private static LoggedTunableNumber strictFilter;
 
   public Tag(TagConsumer consumer, TagIO... io) {
     this.consumer = consumer;
@@ -58,6 +59,7 @@ public class Tag extends SubsystemBase {
           new LoggedTunableNumber(
               "Tag/Camera" + Integer.toString(i) + "/PoseEstimationEnabled", 1.0);
     }
+    strictFilter = new LoggedTunableNumber("Tag/strictFilter", 0.0);
   }
 
   /**
@@ -106,20 +108,40 @@ public class Tag extends SubsystemBase {
 
       // Loop over pose observations
       for (var observation : inputs[cameraIndex].poseObservations) {
-        // Check whether to reject pose
-        boolean rejectPose =
-            observation.tagCount() == 0 // Must have at least one tag
-                || (observation.tagCount() == 1
-                    && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
-                || Math.abs(observation.pose().getZ())
-                    > maxZError // Must have realistic Z coordinate
+        boolean rejectPose;
+        if (strictFilter.get() > 0.5) {
+          rejectPose =
+              observation.tagCount() == 0 // Must have at least one tag
+                  || (observation.tagCount() == 1
+                      && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
+                  || Math.abs(observation.pose().getZ())
+                      > maxZError // Must have realistic Z coordinate
 
-                // Must be within the field boundaries
-                || observation.pose().getX() < 0.0
-                || observation.pose().getX() > aprilTagLayout.getFieldLength()
-                || observation.pose().getY() < 0.0
-                || observation.pose().getY() > aprilTagLayout.getFieldWidth();
+                  // Must be within the field boundaries
+                  || observation.pose().getX() < 0.0
+                  || observation.pose().getX() > aprilTagLayout.getFieldLength()
+                  || observation.pose().getY() < 0.0
+                  || observation.pose().getY() > aprilTagLayout.getFieldWidth()
+                  || observation
+                          .pose()
+                          .toPose2d()
+                          .getTranslation()
+                          .getDistance(RobotState.getInstance().getRobotPose().getTranslation())
+                      > 0.1;
+        } else {
+          rejectPose =
+              observation.tagCount() == 0 // Must have at least one tag
+                  || (observation.tagCount() == 1
+                      && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
+                  || Math.abs(observation.pose().getZ())
+                      > maxZError // Must have realistic Z coordinate
 
+                  // Must be within the field boundaries
+                  || observation.pose().getX() < 0.0
+                  || observation.pose().getX() > aprilTagLayout.getFieldLength()
+                  || observation.pose().getY() < 0.0
+                  || observation.pose().getY() > aprilTagLayout.getFieldWidth();
+        }
         // Add pose to log
         robotPoses.add(observation.pose());
         if (rejectPose) {

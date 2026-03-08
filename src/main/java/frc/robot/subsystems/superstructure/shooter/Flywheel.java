@@ -27,7 +27,7 @@ public class Flywheel {
   // Efficiency coefficient: accounts for friction between wheels and ball
   // exitVelocity = wheelSurfaceVelocity * efficiency
   private static final LoggedTunableNumber efficiency =
-      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.676); // 0.676
+      new LoggedTunableNumber("Shooter/Flywheel/Efficiency", 0.73); // 0.676
 
   // Slew rate limiter parameters (rad/s per second)
   private static final LoggedTunableNumber maxAccelRadPerSec2 =

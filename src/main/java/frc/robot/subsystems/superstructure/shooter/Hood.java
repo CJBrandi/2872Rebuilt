@@ -138,7 +138,7 @@ public class Hood {
       // Check if at goal (compare actual position, not profile setpoint)
       atGoal =
           EqualsUtil.epsilonEquals(
-              inputs.positionRad, goalState.position, Units.degreesToRadians(0.5));
+              inputs.positionRad, goalState.position, Units.degreesToRadians(1));
     } else {
       atGoal = false;
     }

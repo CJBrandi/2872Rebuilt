@@ -13,9 +13,6 @@ import frc.robot.Constants;
 public class TurretIOSim implements TurretIO {
   private static final double moi = 0.001;
 
-  // Turret hard stop limits (degrees)
-  private static final double MAX_ANGLE_DEG = 185.0;
-
   // Hall effect sensor positions (degrees) and detection tolerance
   private static final double HALL_TOLERANCE_DEG = 2.0;
 
@@ -146,15 +143,14 @@ public class TurretIOSim implements TurretIO {
     simState = VecBuilder.fill(updatedState.get(0, 0), updatedState.get(1, 0));
 
     // Apply turret hard stop limits
-    double maxAngleRad = Units.degreesToRadians(MAX_ANGLE_DEG);
-    if (simState.get(0) <= -maxAngleRad) {
-      simState.set(0, 0, -maxAngleRad);
+    if (simState.get(0) <= TurretLimits.MIN_ANGLE_RAD) {
+      simState.set(0, 0, TurretLimits.MIN_ANGLE_RAD);
       if (simState.get(1) < 0) {
         simState.set(1, 0, 0.0);
       }
     }
-    if (simState.get(0) >= maxAngleRad) {
-      simState.set(0, 0, maxAngleRad);
+    if (simState.get(0) >= TurretLimits.MAX_ANGLE_RAD) {
+      simState.set(0, 0, TurretLimits.MAX_ANGLE_RAD);
       if (simState.get(1) > 0) {
         simState.set(1, 0, 0.0);
       }

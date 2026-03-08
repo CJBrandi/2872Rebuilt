@@ -16,10 +16,10 @@ import lombok.Getter;
 
 public class Intake extends SubsystemBase {
   // Angle constants: 0° = ground/deployed, 90° = stowed
-  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-15);
+  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-10);
   public static final Rotation2d maxAngle = Rotation2d.fromDegrees(90);
   public static final Rotation2d stowedAngle = Rotation2d.fromDegrees(90);
-  public static final Rotation2d groundAngle = Rotation2d.fromDegrees(0);
+  public static final Rotation2d groundAngle = Rotation2d.fromDegrees(-8);
 
   // Subsystems
   @Getter private final Pivot pivot;
