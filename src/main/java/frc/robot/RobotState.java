@@ -17,12 +17,22 @@ public class RobotState {
 
   private static final double TURRET_BUFFER_DURATION_SECS = 2.0;
 
+  public enum TurretShooterMode {
+    SOTM,
+    AIM,
+    MANUAL
+  }
+
   @Getter @Setter private Pose2d robotPose = new Pose2d();
   @Getter @Setter private ChassisSpeeds robotVelocity = new ChassisSpeeds();
   @Getter private Translation2d bestFuelCluster = new Translation2d();
   @Getter private boolean hasBestFuelCluster = false;
+  @Setter @Getter boolean strictPoseEstimation = false;
 
   @Getter @Setter private boolean autoEmpty = false;
+  @Getter @Setter private TurretShooterMode turretShooterRequestedMode = TurretShooterMode.SOTM;
+
+  @Getter @Setter private TurretShooterMode turretShooterActiveMode = TurretShooterMode.SOTM;
 
   // Turret angle buffer for vision pose estimation
   private final NavigableMap<Double, Rotation2d> turretAngleBuffer = new TreeMap<>();
@@ -68,11 +78,21 @@ public class RobotState {
     hasBestFuelCluster = false;
   }
 
+  public boolean isSotm() {
+    return turretShooterRequestedMode == TurretShooterMode.SOTM;
+  }
+
+  public void setSotm(boolean sotm) {
+    turretShooterRequestedMode = sotm ? TurretShooterMode.SOTM : TurretShooterMode.AIM;
+  }
+
   public void periodic() {
     // Calculate horizontal distance from robot to HUB
     Translation3d hubCenter = FieldConstants.Hub.topCenterPoint.get();
     double horizontalDistance = robotPose.getTranslation().getDistance(hubCenter.toTranslation2d());
     Logger.recordOutput("RobotState/AutoEmpty", autoEmpty);
+    Logger.recordOutput("RobotState/TurretShooterRequestedMode", turretShooterRequestedMode.name());
+    Logger.recordOutput("RobotState/TurretShooterActiveMode", turretShooterActiveMode.name());
     Logger.recordOutput("RobotState/HubDistanceMeters", horizontalDistance);
     Logger.recordOutput("RobotState/FuelPickup/HasBestCluster", hasBestFuelCluster);
     Logger.recordOutput("RobotState/FuelPickup/BestCluster", bestFuelCluster);

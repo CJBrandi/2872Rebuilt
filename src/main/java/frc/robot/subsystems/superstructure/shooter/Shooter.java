@@ -26,6 +26,7 @@ public class Shooter {
   private double goalExitVelocityMps = 0.0;
   private double goalHoodAngleRad = Hood.getMinAngleRad();
   private double goalHoodVelocityRadPerSec = 0.0;
+  private boolean forceHoodMinimum = false;
 
   public Shooter(FlywheelIO flywheelIO, HoodIO hoodIO) {
     this.flywheel = new Flywheel(flywheelIO);
@@ -35,22 +36,30 @@ public class Shooter {
   public void periodic() {
     // Apply goals to components BEFORE running periodic control loops
     // This ensures the correct mode/targets are set before control runs
-    if (manualModeEnabled.get() > 0.5) {
+    boolean manualMode = manualModeEnabled.get() > 0.5;
+    if (manualMode) {
       // Manual mode: use tunable RPM and angle values with closed-loop control
       double manualVelocityRadPerSec =
           Units.rotationsPerMinuteToRadiansPerSecond(manualFlywheelRPM.get());
       flywheel.runWheelVelocity(manualVelocityRadPerSec);
-      hood.setTargetAngle(Math.toRadians(manualHoodAngleDeg.get()), 0.0);
     } else {
       // Normal mode: use goals from Superstructure
       flywheel.setTargetExitVelocity(goalExitVelocityMps);
+    }
+
+    if (forceHoodMinimum) {
+      hood.setTargetAngle(Hood.getMinAngleRad(), 0.0);
+    } else if (manualMode) {
+      hood.setTargetAngle(Math.toRadians(manualHoodAngleDeg.get()), 0.0);
+    } else {
       hood.setTargetAngle(Math.toRadians(90) - goalHoodAngleRad, goalHoodVelocityRadPerSec);
     }
 
     flywheel.periodic();
     hood.periodic();
 
-    Logger.recordOutput("Shooter/ManualMode", manualModeEnabled.get() > 0.5);
+    Logger.recordOutput("Shooter/ManualMode", manualMode);
+    Logger.recordOutput("Shooter/ForceHoodMinimum", forceHoodMinimum);
     Logger.recordOutput("Shooter/Manual/FlywheelRPM", manualFlywheelRPM.get());
     Logger.recordOutput("Shooter/Manual/HoodAngleDeg", manualHoodAngleDeg.get());
     Logger.recordOutput("Shooter/Ready", isReady());
@@ -96,6 +105,10 @@ public class Shooter {
     goalExitVelocityMps = 0.0;
     goalHoodAngleRad = Hood.getMinAngleRad();
     goalHoodVelocityRadPerSec = 0.0;
+  }
+
+  public void setForceHoodMinimum(boolean forceHoodMinimum) {
+    this.forceHoodMinimum = forceHoodMinimum;
   }
 
   public Command hoodHomingCommand() {

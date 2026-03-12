@@ -260,9 +260,21 @@ public class FieldConstants {
 
   /** Lob-shot targets (defined in blue-alliance field coordinates). */
   public static class Lob {
+    private static final Translation2d HUB_CENTER = Hub.topCenterPoint.getBlue().toTranslation2d();
+    private static final Translation2d LEFT_FIELD_CORNER = new Translation2d(0.0, fieldWidth);
+    private static final Translation2d RIGHT_FIELD_CORNER = new Translation2d(0.0, 0.0);
+    private static final Translation2d LOB_LEFT_POINT = midpoint(HUB_CENTER, LEFT_FIELD_CORNER);
+    private static final Translation2d LOB_RIGHT_POINT = midpoint(HUB_CENTER, RIGHT_FIELD_CORNER);
+
+    private static Translation2d midpoint(Translation2d first, Translation2d second) {
+      return new Translation2d(
+          (first.getX() + second.getX()) / 2.0, (first.getY() + second.getY()) / 2.0);
+    }
+
     public static final FlippableTranslation3d LOB_RIGHT =
-        new FlippableTranslation3d(2.0, 1.0, 0.0);
-    public static final FlippableTranslation3d LOB_LEFT = new FlippableTranslation3d(2.0, 7.0, 0.0);
+        new FlippableTranslation3d(LOB_RIGHT_POINT.getX(), LOB_RIGHT_POINT.getY(), 0.0);
+    public static final FlippableTranslation3d LOB_LEFT =
+        new FlippableTranslation3d(LOB_LEFT_POINT.getX(), LOB_LEFT_POINT.getY(), 0.0);
   }
 
   /** Left Bump related constants */

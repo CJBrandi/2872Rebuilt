@@ -20,11 +20,10 @@ final class TurretLimits {
     double selectedDeg = Double.NaN;
     double bestDistance = Double.POSITIVE_INFINITY;
 
-    for (int wrap = -2; wrap <= 2; wrap++) {
+    int minWrap = (int) Math.ceil((MIN_ANGLE_DEG - principalDeg) / 360.0);
+    int maxWrap = (int) Math.floor((MAX_ANGLE_DEG - principalDeg) / 360.0);
+    for (int wrap = minWrap; wrap <= maxWrap; wrap++) {
       double candidateDeg = principalDeg + 360.0 * wrap;
-      if (candidateDeg < MIN_ANGLE_DEG || candidateDeg > MAX_ANGLE_DEG) {
-        continue;
-      }
 
       double distance = Math.abs(candidateDeg - referenceDeg);
       if (distance < bestDistance) {

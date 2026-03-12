@@ -17,6 +17,7 @@ import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.Getter;
+import lombok.Setter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -56,10 +57,16 @@ public class ShotCalculator {
 
   private static ShotCalculator instance;
 
-  enum ShotMode {
+  private enum ShotMode {
     HUB,
     LOB_LEFT,
-    LOB_RIGHT
+    LOB_RIGHT,
+    ALLIANCE_HUB
+  }
+
+  public enum TargetingMode {
+    AUTO,
+    ALLIANCE_HUB
   }
 
   private static class LookupProfile {
@@ -96,7 +103,6 @@ public class ShotCalculator {
       ShotMode shotMode, LookupProfile lookupProfile, Translation2d targetPosition) {}
 
   private final LookupProfile hubLookupProfile = new LookupProfile("hub_lookup_vector.json");
-  private final LookupProfile lobLookupProfile = new LookupProfile("lob_lookup_vector.json");
 
   @Getter private double shooterHeight = 0.5;
   @Getter private double targetHeight = 1.75;
@@ -104,6 +110,7 @@ public class ShotCalculator {
   @Getter private double maxDistance = 0.0;
   @Getter private boolean loaded = false;
   @Getter private boolean shootOnMoveEnabled = true;
+  @Getter @Setter private TargetingMode targetingMode = TargetingMode.AUTO;
 
   @Getter private boolean shotStable = false;
 
@@ -140,8 +147,7 @@ public class ShotCalculator {
   private void load() {
     Path deployPath = Filesystem.getDeployDirectory().toPath();
     loadVectorLookup(deployPath.resolve("hub_lookup_vector.json"), hubLookupProfile);
-    loadVectorLookup(deployPath.resolve("lob_lookup_vector.json"), lobLookupProfile);
-    loaded = hubLookupProfile.loaded || lobLookupProfile.loaded;
+    loaded = hubLookupProfile.loaded;
   }
 
   private void loadVectorLookup(Path path, LookupProfile profile) {
@@ -273,9 +279,9 @@ public class ShotCalculator {
             lookupYaw, shot, turretPosition, compensationSolution.compensatedPosition());
 
     Logger.recordOutput("ShotCalculator/ShootOnMoveEnabled", shootOnMoveEnabled);
+    Logger.recordOutput("ShotCalculator/TargetingMode", targetingMode.name());
     Logger.recordOutput("ShotCalculator/VectorLookupLoaded", true);
     Logger.recordOutput("ShotCalculator/HubLookupLoaded", hubLookupProfile.loaded);
-    Logger.recordOutput("ShotCalculator/LobLookupLoaded", lobLookupProfile.loaded);
     Logger.recordOutput("ShotCalculator/ShotMode", selection.shotMode().name());
     Logger.recordOutput("ShotCalculator/ShotStable", shotStable);
     Logger.recordOutput("ShotCalculator/SelectionRobotX", robotPose.getX());
@@ -327,6 +333,10 @@ public class ShotCalculator {
   }
 
   private ShotSelection selectShotSelection(Pose2d robotPose) {
+    if (targetingMode == TargetingMode.ALLIANCE_HUB) {
+      return new ShotSelection(ShotMode.ALLIANCE_HUB, hubLookupProfile, selectAllianceHubTarget());
+    }
+
     boolean flipFieldCoordinates = AllianceFlipUtil.shouldFlip();
     Logger.recordOutput("ShotCalculator/Alliance", flipFieldCoordinates ? "Red" : "Blue");
 
@@ -337,12 +347,30 @@ public class ShotCalculator {
           hubLookupProfile,
           FieldConstants.Hub.topCenterPoint.get().toTranslation2d());
       case LOB_LEFT -> new ShotSelection(
-          ShotMode.LOB_LEFT, lobLookupProfile, FieldConstants.Lob.LOB_LEFT.get().toTranslation2d());
+          ShotMode.LOB_LEFT, hubLookupProfile, selectAllianceLobTarget(true, flipFieldCoordinates));
       case LOB_RIGHT -> new ShotSelection(
           ShotMode.LOB_RIGHT,
-          lobLookupProfile,
-          FieldConstants.Lob.LOB_RIGHT.get().toTranslation2d());
+          hubLookupProfile,
+          selectAllianceLobTarget(false, flipFieldCoordinates));
+      case ALLIANCE_HUB -> new ShotSelection(
+          ShotMode.ALLIANCE_HUB, hubLookupProfile, selectAllianceHubTarget());
     };
+  }
+
+  private Translation2d selectAllianceHubTarget() {
+    return FieldConstants.Hub.topCenterPoint.get().toTranslation2d();
+  }
+
+  static Translation2d selectAllianceLobTarget(boolean leftTarget, boolean flipFieldCoordinates) {
+    Translation3d lobTarget =
+        leftTarget
+            ? (flipFieldCoordinates
+                ? FieldConstants.Lob.LOB_LEFT.getRed()
+                : FieldConstants.Lob.LOB_LEFT.getBlue())
+            : (flipFieldCoordinates
+                ? FieldConstants.Lob.LOB_RIGHT.getRed()
+                : FieldConstants.Lob.LOB_RIGHT.getBlue());
+    return lobTarget.toTranslation2d();
   }
 
   static ShotMode selectShotMode(Pose2d robotPose, boolean flipFieldCoordinates) {

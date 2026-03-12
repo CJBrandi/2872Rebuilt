@@ -10,7 +10,6 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.RobotState;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
-import frc.robot.subsystems.superstructure.shooter.Hood;
 import frc.robot.subsystems.superstructure.shooter.Shooter;
 import frc.robot.subsystems.superstructure.turret.Turret;
 import frc.robot.util.FieldConstants;
@@ -19,21 +18,27 @@ import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.ShotCalculator;
 import frc.robot.util.ShotVectorCompensator;
 import lombok.Getter;
+import lombok.Setter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Superstructure extends SubsystemBase {
+  private static final LoggedTunableNumber manualModeEnabled =
+      new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber TRENCH_LOOKAHEAD_SECS =
-      new LoggedTunableNumber("Superstructure/TrenchLookaheadSecs", 0.35);
-  private static final double TRENCH_STOW_PITCH_RAD = Math.PI / 2.0 - Hood.getMinAngleRad();
+      new LoggedTunableNumber("Superstructure/TrenchLookaheadSecs", 0.5);
+  private static final LoggedTunableNumber TRENCH_STATIC_ZONE_METERS =
+      new LoggedTunableNumber("Superstructure/TrenchStaticZoneMeters", Units.inchesToMeters(6.0));
   private static final double TRENCH_CROSSING_EPSILON = 1e-9;
+  private static final double AIM_PITCH_OFFSET_RAD = Units.degreesToRadians(0.5);
 
   @Getter private final Shooter shooter;
   @Getter private final Turret turret;
   @Getter private final Indexer indexer;
   private final ShotCalculator shotCalculator;
   private boolean trenchStowActive = false;
-  private int fuelSimInventoryCount = 0;
+  private RobotState.TurretShooterMode activeTurretShooterMode = RobotState.TurretShooterMode.SOTM;
+  @Getter @Setter private int fuelSimInventoryCount = 0;
 
   public Superstructure(Shooter shooter, Turret turret, Indexer indexer) {
     this.shooter = shooter;
@@ -44,44 +49,57 @@ public class Superstructure extends SubsystemBase {
 
   @Override
   public void periodic() {
-    indexer.periodic();
-    shooter.periodic();
-    turret.periodic();
-    var params = shotCalculator.getParameters();
+    var robotState = RobotState.getInstance();
+    activeTurretShooterMode = resolveActiveMode(robotState);
+    robotState.setTurretShooterActiveMode(activeTurretShooterMode);
+    configureShotCalculator(activeTurretShooterMode);
 
     if (shooter.isHoodHomed()) {
       trenchStowActive = shouldStowHoodForTrench();
-      if (trenchStowActive) {
-        shooter.setGoals(params.exitVelocity(), TRENCH_STOW_PITCH_RAD, 0.0);
-      } else {
+      shooter.setForceHoodMinimum(trenchStowActive);
+
+      if (activeTurretShooterMode != RobotState.TurretShooterMode.MANUAL) {
+        var params = shotCalculator.getParameters();
         shooter.setGoals(
             params.exitVelocity(),
-            params.pitchAngle() + Units.degreesToRadians(0.5),
+            params.pitchAngle() + AIM_PITCH_OFFSET_RAD,
             params.pitchVelocity());
-      }
-      turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
-
-      if (isReadyToShoot()) {
-        indexer.runIntakeVelocity();
-      } else {
-        indexer.stop();
+        turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
       }
     } else {
       trenchStowActive = false;
+      shooter.setForceHoodMinimum(false);
     }
 
-    // Logger.recordOutput("Superstructure/ReadyToShoot", readyToShoot);
+    shooter.periodic();
+    turret.periodic();
+
+    if (isReadyToShoot()) {
+      indexer.runIntakeVelocity();
+    } else {
+      indexer.stop();
+    }
+
+    indexer.periodic();
+
+    Logger.recordOutput(
+        "Superstructure/RequestedTurretShooterMode",
+        robotState.getTurretShooterRequestedMode().name());
+    Logger.recordOutput("Superstructure/ActiveTurretShooterMode", activeTurretShooterMode.name());
+    Logger.recordOutput("Superstructure/ManualEnabled", manualModeEnabled.get() > 0.5);
     Logger.recordOutput("Superstructure/TrenchStowActive", trenchStowActive);
     Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);
   }
 
   @AutoLogOutput(key = "Superstructure/ReadyToShoot")
   public boolean isReadyToShoot() {
+    boolean requiresStabilityGate = activeTurretShooterMode != RobotState.TurretShooterMode.MANUAL;
+
     return RobotState.getInstance().isAutoEmpty()
         && !trenchStowActive
         && shooter.isReady()
         && turret.isAtGoal()
-        && shotCalculator.isShotStable();
+        && (!requiresStabilityGate || shotCalculator.isShotStable());
   }
 
   private boolean shouldStowHoodForTrench() {
@@ -95,18 +113,24 @@ public class Superstructure extends SubsystemBase {
             TRENCH_LOOKAHEAD_SECS.get());
 
     return shouldStowForTrench(
-        currentTranslation, projectedTranslation, Constants.RobotDimensions.length);
+        currentTranslation,
+        projectedTranslation,
+        Constants.RobotDimensions.length,
+        TRENCH_STATIC_ZONE_METERS.get());
   }
 
   static boolean shouldStowForTrench(
       Translation2d currentTranslation,
       Translation2d projectedTranslation,
-      double robotLengthMeters) {
+      double robotLengthMeters,
+      double trenchSafetyZoneMeters) {
     double halfRobotLengthMeters = robotLengthMeters / 2.0;
-    return isUnderTrenchOpening(
-            currentTranslation, FieldConstants.LinesVertical.hubCenter, halfRobotLengthMeters)
-        || isUnderTrenchOpening(
-            currentTranslation, FieldConstants.LinesVertical.oppHubCenter, halfRobotLengthMeters)
+    double stowZoneMeters = halfRobotLengthMeters + Math.max(0.0, trenchSafetyZoneMeters);
+
+    return isWithinTrenchStowZone(
+            currentTranslation, FieldConstants.LinesVertical.hubCenter, stowZoneMeters)
+        || isWithinTrenchStowZone(
+            currentTranslation, FieldConstants.LinesVertical.oppHubCenter, stowZoneMeters)
         || crossesTrenchPlane(
             currentTranslation, projectedTranslation, FieldConstants.LinesVertical.hubCenter)
         || crossesTrenchPlane(
@@ -123,9 +147,9 @@ public class Superstructure extends SubsystemBase {
     return currentTranslation.plus(fieldRelativeVelocity.times(Math.max(lookaheadSecs, 0.0)));
   }
 
-  private static boolean isUnderTrenchOpening(
-      Translation2d translation, double trenchX, double halfRobotLengthMeters) {
-    return Math.abs(translation.getX() - trenchX) <= halfRobotLengthMeters
+  private static boolean isWithinTrenchStowZone(
+      Translation2d translation, double trenchX, double stowZoneMeters) {
+    return Math.abs(translation.getX() - trenchX) <= stowZoneMeters
         && isWithinTrenchOpeningY(translation.getY());
   }
 
@@ -160,6 +184,30 @@ public class Superstructure extends SubsystemBase {
 
   private static boolean isWithinInclusiveRange(double value, double boundA, double boundB) {
     return value >= Math.min(boundA, boundB) && value <= Math.max(boundA, boundB);
+  }
+
+  private RobotState.TurretShooterMode resolveActiveMode(RobotState robotState) {
+    if (manualModeEnabled.get() > 0.5) {
+      return RobotState.TurretShooterMode.MANUAL;
+    }
+    return robotState.getTurretShooterRequestedMode();
+  }
+
+  private void configureShotCalculator(RobotState.TurretShooterMode mode) {
+    switch (mode) {
+      case SOTM -> {
+        shotCalculator.setShootOnMoveEnabled(true);
+        shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.AUTO);
+      }
+      case AIM -> {
+        shotCalculator.setShootOnMoveEnabled(false);
+        shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.ALLIANCE_HUB);
+      }
+      case MANUAL -> {
+        shotCalculator.setShootOnMoveEnabled(false);
+        shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.AUTO);
+      }
+    }
   }
 
   /** Increments simulated shooter inventory when a fuel enters the intake box. */

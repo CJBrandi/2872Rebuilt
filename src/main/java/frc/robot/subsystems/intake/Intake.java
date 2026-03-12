@@ -21,6 +21,8 @@ public class Intake extends SubsystemBase {
   public static final Rotation2d stowedAngle = Rotation2d.fromDegrees(90);
   public static final Rotation2d groundAngle = Rotation2d.fromDegrees(-8);
 
+  private boolean runningIntake = false;
+
   // Subsystems
   @Getter private final Pivot pivot;
   @Getter private final Roller roller;
@@ -46,6 +48,16 @@ public class Intake extends SubsystemBase {
   public void deploy() {
     pivot.setGoal(() -> groundAngle);
     roller.runIntake();
+  }
+
+  public void toggleIntake() {
+    if (runningIntake) {
+      roller.stop();
+      runningIntake = false;
+    } else {
+      roller.runIntake();
+      runningIntake = true;
+    }
   }
 
   public boolean isAtGoal() {

@@ -1,54 +1,51 @@
 package frc.robot.subsystems.superstructure.turret;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.math.geometry.Rotation2d;
 import org.junit.jupiter.api.Test;
 
 class TurretLimitsTest {
-  @Test
-  void keepsAnglesAlreadyInsideRange() {
-    double selected =
-        Units.radiansToDegrees(
-            TurretLimits.findBestAngleWithinLimitsRadians(
-                Units.degreesToRadians(-90.0), Units.degreesToRadians(-100.0)));
+  private static final double EPSILON = 1e-9;
 
-    assertEquals(-90.0, selected, 1e-9);
+  @Test
+  void selectAngleSupportsAllowedNegativeAngles() {
+    double startReferenceRad = Rotation2d.fromDegrees(-180.0).getRadians();
+
+    TurretLimits.Selection angleMinus300 =
+        TurretLimits.selectAngleRadians(
+            Rotation2d.fromDegrees(-300.0).getRadians(), startReferenceRad);
+    TurretLimits.Selection angleMinus200 =
+        TurretLimits.selectAngleRadians(
+            Rotation2d.fromDegrees(-200.0).getRadians(), startReferenceRad);
+    TurretLimits.Selection angleMinus100 =
+        TurretLimits.selectAngleRadians(
+            Rotation2d.fromDegrees(-100.0).getRadians(), startReferenceRad);
+
+    assertAll(
+        () -> assertEquals(-300.0, angleMinus300.selectedDeg(), EPSILON),
+        () -> assertEquals(-200.0, angleMinus200.selectedDeg(), EPSILON),
+        () -> assertEquals(-100.0, angleMinus100.selectedDeg(), EPSILON),
+        () -> assertFalse(angleMinus300.usedLimitFallback()),
+        () -> assertFalse(angleMinus200.usedLimitFallback()),
+        () -> assertFalse(angleMinus100.usedLimitFallback()));
   }
 
   @Test
-  void wrapsEquivalentPositiveRequestIntoNegativeRange() {
-    double selected =
-        Units.radiansToDegrees(
-            TurretLimits.findBestAngleWithinLimitsRadians(
-                Units.degreesToRadians(160.0), Units.degreesToRadians(-180.0)));
+  void selectAngleChoosesClosestWrappedEquivalentFromReference() {
+    TurretLimits.Selection nearNegativeReference =
+        TurretLimits.selectAngleRadians(
+            Rotation2d.fromDegrees(25.0).getRadians(), Rotation2d.fromDegrees(-180.0).getRadians());
+    TurretLimits.Selection nearPositiveReference =
+        TurretLimits.selectAngleRadians(
+            Rotation2d.fromDegrees(25.0).getRadians(), Rotation2d.fromDegrees(10.0).getRadians());
 
-    assertEquals(-200.0, selected, 1e-9);
-  }
-
-  @Test
-  void clampsUnreachableRequestsToNearestLimit() {
-    double selected =
-        Units.radiansToDegrees(
-            TurretLimits.findBestAngleWithinLimitsRadians(
-                Units.degreesToRadians(20.0), Units.degreesToRadians(-20.0)));
-
-    assertEquals(0.0, selected, 1e-9);
-  }
-
-  @Test
-  void clampsAnglesToConfiguredRange() {
-    assertEquals(-200.0, TurretLimits.clampDegrees(-250.0), 1e-9);
-    assertEquals(0.0, TurretLimits.clampDegrees(25.0), 1e-9);
-  }
-
-  @Test
-  void blocksOnlyOutwardCommandsAtHardStops() {
-    assertTrue(TurretLimits.commandWouldPushPastLimit(Units.degreesToRadians(0.0), 1.0));
-    assertTrue(TurretLimits.commandWouldPushPastLimit(Units.degreesToRadians(-200.0), -1.0));
-    assertFalse(TurretLimits.commandWouldPushPastLimit(Units.degreesToRadians(-200.0), 1.0));
-    assertFalse(TurretLimits.commandWouldPushPastLimit(Units.degreesToRadians(-100.0), -1.0));
+    assertAll(
+        () -> assertEquals(-335.0, nearNegativeReference.selectedDeg(), EPSILON),
+        () -> assertEquals(25.0, nearPositiveReference.selectedDeg(), EPSILON),
+        () -> assertFalse(nearNegativeReference.usedLimitFallback()),
+        () -> assertFalse(nearPositiveReference.usedLimitFallback()));
   }
 }

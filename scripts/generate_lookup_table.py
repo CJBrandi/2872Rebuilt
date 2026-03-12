@@ -27,25 +27,14 @@ import numpy as np
 
 from shooter_trajectory_backend import (
     ShooterConfig,
-    TrajectoryResult,
     solve_trajectory,
     velocity_to_rpm,
 )
 
 
 HUB_DEFAULT_MIN_DISTANCE_M = 1.5
-HUB_DEFAULT_MAX_DISTANCE_M = 6.0
+HUB_DEFAULT_MAX_DISTANCE_M = 16.0
 HUB_DEFAULT_STEP_M = 0.1
-
-LOB_DEFAULT_MIN_DISTANCE_M = 4.0
-LOB_DEFAULT_MAX_DISTANCE_M = 15.0
-LOB_DEFAULT_STEP_M = 0.1
-LOB_MAX_LAUNCH_SPEED_MPS = 18.0
-LOB_PITCH_SEARCH_ITERATIONS = 12
-LOB_SPEED_SEARCH_ITERATIONS = 26
-LOB_TRAJECTORY_DT_SEC = 0.0025
-LOB_MAX_FLIGHT_TIME_SEC = 5.0
-LOB_TARGET_HEIGHT_TOLERANCE_M = 1e-3
 
 
 def ensure_parent_dir(path: str) -> None:
@@ -68,7 +57,6 @@ def write_lookup_table(
     step: float,
     config: ShooterConfig,
     verbose: bool,
-    optimize_steep_entry: bool = False,
 ) -> None:
     lookup_table = generate_lookup_table(
         min_distance=min_distance,
@@ -76,7 +64,6 @@ def write_lookup_table(
         step=step,
         config=config,
         verbose=verbose,
-        optimize_steep_entry=optimize_steep_entry,
     )
     vector_lookup_table = generate_vector_lookup_table(lookup_table)
     ensure_parent_dir(output_path)
@@ -86,9 +73,8 @@ def write_lookup_table(
         print(f"Vector lookup table written to: {output_path}")
 
 
-def generate_default_profiles(verbose: bool) -> None:
+def generate_default_profile(verbose: bool) -> None:
     hub_output = default_output_path("hub_lookup_vector.json")
-    lob_output = default_output_path("lob_lookup_vector.json")
 
     if verbose:
         print("Generating HUB lookup profile...")
@@ -102,204 +88,6 @@ def generate_default_profiles(verbose: bool) -> None:
         verbose=verbose,
     )
 
-    if verbose:
-        print("\nGenerating LOB lookup profile...")
-    lob_config = ShooterConfig()
-    lob_config.target_height = 0.0
-    write_lookup_table(
-        output_path=lob_output,
-        min_distance=LOB_DEFAULT_MIN_DISTANCE_M,
-        max_distance=LOB_DEFAULT_MAX_DISTANCE_M,
-        step=LOB_DEFAULT_STEP_M,
-        config=lob_config,
-        verbose=verbose,
-        optimize_steep_entry=True,
-    )
-
-
-def _compute_drag_accel(vx: float, vz: float, config: ShooterConfig) -> tuple[float, float]:
-    speed = math.hypot(vx, vz)
-    if speed <= 1e-9:
-        return 0.0, -9.806
-
-    drag_scale = (
-        0.5
-        * config.air_density
-        * config.drag_coefficient
-        * config.cross_sectional_area
-        / config.ball_mass
-        * speed
-    )
-    ax = -drag_scale * vx
-    az = -9.806 - drag_scale * vz
-    return ax, az
-
-
-def _rk4_step_2d(state: tuple[float, float, float, float], dt: float, config: ShooterConfig):
-    def derivatives(s: tuple[float, float, float, float]):
-        _, _, vx, vz = s
-        ax, az = _compute_drag_accel(vx, vz, config)
-        return vx, vz, ax, az
-
-    x, z, vx, vz = state
-    k1 = derivatives((x, z, vx, vz))
-    k2 = derivatives(tuple(state[i] + 0.5 * dt * k1[i] for i in range(4)))
-    k3 = derivatives(tuple(state[i] + 0.5 * dt * k2[i] for i in range(4)))
-    k4 = derivatives(tuple(state[i] + dt * k3[i] for i in range(4)))
-    return tuple(state[i] + dt / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]) for i in range(4))
-
-
-def simulate_to_distance(
-    distance: float,
-    speed: float,
-    pitch_rad: float,
-    config: ShooterConfig,
-    dt: float = LOB_TRAJECTORY_DT_SEC,
-    max_flight_time: float = LOB_MAX_FLIGHT_TIME_SEC,
-):
-    vx = speed * math.cos(pitch_rad)
-    vz = speed * math.sin(pitch_rad)
-    state = (0.0, config.shooter_height, vx, vz)
-    t = 0.0
-    max_steps = max(1, int(max_flight_time / dt))
-
-    for _ in range(max_steps):
-        prev_state = state
-        prev_t = t
-        state = _rk4_step_2d(state, dt, config)
-        t += dt
-
-        x0, z0, vx0, vz0 = prev_state
-        x1, z1, vx1, vz1 = state
-        if x1 >= distance:
-            if x1 == x0:
-                alpha = 0.0
-            else:
-                alpha = (distance - x0) / (x1 - x0)
-                alpha = max(0.0, min(1.0, alpha))
-
-            return {
-                "z": z0 + alpha * (z1 - z0),
-                "vx": vx0 + alpha * (vx1 - vx0),
-                "vz": vz0 + alpha * (vz1 - vz0),
-                "flight_time": prev_t + alpha * (t - prev_t),
-            }
-
-        # If we are falling and below the target height before reaching x=distance,
-        # this shot will not recover and hit the target.
-        if z1 < config.target_height and vz1 < 0.0:
-            return None
-
-    return None
-
-
-def solve_speed_for_pitch(
-    distance: float,
-    pitch_rad: float,
-    config: ShooterConfig,
-    max_speed_mps: float,
-):
-    low_speed = 0.5
-    high_speed = max_speed_mps
-    target_height = config.target_height
-
-    low_state = simulate_to_distance(distance, low_speed, pitch_rad, config)
-    low_height = -math.inf if low_state is None else low_state["z"]
-    high_state = simulate_to_distance(distance, high_speed, pitch_rad, config)
-    high_height = -math.inf if high_state is None else high_state["z"]
-
-    if high_height < target_height - LOB_TARGET_HEIGHT_TOLERANCE_M:
-        return None
-
-    if low_height >= target_height:
-        return low_speed, low_state
-
-    for _ in range(LOB_SPEED_SEARCH_ITERATIONS):
-        mid_speed = 0.5 * (low_speed + high_speed)
-        mid_state = simulate_to_distance(distance, mid_speed, pitch_rad, config)
-        mid_height = -math.inf if mid_state is None else mid_state["z"]
-
-        if mid_height >= target_height:
-            high_speed = mid_speed
-            high_state = mid_state
-        else:
-            low_speed = mid_speed
-
-    if high_state is None:
-        return None
-
-    return high_speed, high_state
-
-
-def solve_steepest_feasible_lob_trajectory(
-    distance: float,
-    config: ShooterConfig,
-    max_speed_mps: float = LOB_MAX_LAUNCH_SPEED_MPS,
-):
-    min_pitch_rad = math.radians(config.min_launch_pitch_deg)
-    max_pitch_rad = math.radians(config.max_launch_pitch_deg)
-
-    # If minimum pitch is infeasible at max speed, no physically feasible shot exists.
-    min_pitch_at_max_speed = simulate_to_distance(distance, max_speed_mps, min_pitch_rad, config)
-    if (
-        min_pitch_at_max_speed is None
-        or min_pitch_at_max_speed["z"] < config.target_height - LOB_TARGET_HEIGHT_TOLERANCE_M
-    ):
-        return None, None, "No feasible shot within launch-speed limit."
-
-    max_pitch_at_max_speed = simulate_to_distance(distance, max_speed_mps, max_pitch_rad, config)
-    if max_pitch_at_max_speed is not None and max_pitch_at_max_speed["z"] >= config.target_height:
-        steepest_pitch_rad = max_pitch_rad
-    else:
-        # Binary search for the highest feasible launch pitch under max_speed_mps.
-        low = min_pitch_rad
-        high = max_pitch_rad
-        for _ in range(LOB_PITCH_SEARCH_ITERATIONS):
-            mid = 0.5 * (low + high)
-            mid_state = simulate_to_distance(distance, max_speed_mps, mid, config)
-            if mid_state is not None and mid_state["z"] >= config.target_height:
-                low = mid
-            else:
-                high = mid
-        steepest_pitch_rad = low
-
-    # Evaluate nearby pitches and choose the steepest entry angle as final answer.
-    candidate_offsets_deg = (0.0, -0.25, -0.5, -1.0, -2.0)
-    candidate_pitches = []
-    for offset_deg in candidate_offsets_deg:
-        pitch = steepest_pitch_rad + math.radians(offset_deg)
-        pitch = max(min_pitch_rad, min(max_pitch_rad, pitch))
-        candidate_pitches.append(pitch)
-    candidate_pitches = sorted(set(candidate_pitches), reverse=True)
-
-    best = None
-    for pitch_rad in candidate_pitches:
-        speed_solution = solve_speed_for_pitch(distance, pitch_rad, config, max_speed_mps)
-        if speed_solution is None:
-            continue
-
-        speed, state = speed_solution
-        if state["vz"] >= 0.0:
-            continue
-
-        entry_angle_rad = math.atan2(abs(state["vx"]), abs(state["vz"]))
-        candidate_result = TrajectoryResult(
-            velocity=float(speed),
-            pitch_rad=float(pitch_rad),
-            yaw_rad=0.0,
-            flight_time=float(state["flight_time"]),
-            entry_angle_rad=float(entry_angle_rad),
-        )
-        candidate_score = (candidate_result.entry_angle_rad, candidate_result.flight_time)
-        if best is None or candidate_score < best[0]:
-            best = (candidate_score, candidate_result)
-
-    if best is None:
-        return None, None, "No feasible descending trajectory within launch-speed limit."
-
-    result = best[1]
-    return result, math.degrees(result.entry_angle_rad), None
-
 
 def generate_lookup_table(
     min_distance: float = 1.5,
@@ -307,7 +95,6 @@ def generate_lookup_table(
     step: float = 0.1,
     config: Optional[ShooterConfig] = None,
     verbose: bool = True,
-    optimize_steep_entry: bool = False,
 ) -> dict:
     """
     Generate lookup table for shooting parameters.
@@ -345,8 +132,6 @@ def generate_lookup_table(
         print(f"  Ball mass:         {config.ball_mass:.3f} kg")
         print(f"  Ball diameter:     {config.ball_diameter * 1000:.1f} mm")
         print(f"  Drag coefficient:  {config.drag_coefficient}")
-        if optimize_steep_entry:
-            print(f"  Max launch speed:  {LOB_MAX_LAUNCH_SPEED_MPS:.1f} m/s")
         print()
         print(f"Distance range: {min_distance:.1f}m to {max_distance:.1f}m, step {step:.2f}m")
         print(f"Total points: {len(distances)}")
@@ -362,17 +147,11 @@ def generate_lookup_table(
     failed_distances = []
     for dist in distances:
         failure_reason = None
-        selected_entry_limit_deg = config.max_entry_angle_deg
-        if optimize_steep_entry:
-            result, selected_entry_limit_deg, failure_reason = solve_steepest_feasible_lob_trajectory(
-                dist, config
-            )
-        else:
-            try:
-                result = solve_trajectory(dist, config, verbose=False)
-            except RuntimeError as error:
-                result = None
-                failure_reason = str(error)
+        try:
+            result = solve_trajectory(dist, config, verbose=False)
+        except RuntimeError as error:
+            result = None
+            failure_reason = str(error)
 
         if result is not None:
             success_count += 1
@@ -384,7 +163,7 @@ def generate_lookup_table(
                 "pitch": round(result.pitch_rad, 6),
                 "flight_time": round(result.flight_time, 4),
                 "entry_angle_deg": round(result.entry_angle_deg, 4),
-                "entry_constraint_deg": round(selected_entry_limit_deg, 4),
+                "entry_constraint_deg": round(config.max_entry_angle_deg, 4),
             }
             entries.append(entry)
 
@@ -413,7 +192,7 @@ def generate_lookup_table(
 
     if not entries:
         raise RuntimeError(
-            "No feasible constrained trajectories in requested range. "
+            "No feasible trajectories in requested range. "
             "Relax constraints or adjust range."
         )
 
@@ -423,11 +202,7 @@ def generate_lookup_table(
             "description": "FRC 2026 shooter trajectory lookup table",
             "generated_by": "generate_lookup_table.py",
             "physics_model": "3D trajectory with magnitude-based drag",
-            "optimization": (
-                f"Steepest feasible entry angle (lob, <= {LOB_MAX_LAUNCH_SPEED_MPS:.1f} m/s launch)"
-                if optimize_steep_entry
-                else "Minimize flight time (Sleipnir/jormungandr)"
-            ),
+            "optimization": "Minimize flight time (Sleipnir/jormungandr)",
             "failed_distance_count": len(failed_distances),
         },
         "config": {
@@ -520,7 +295,7 @@ def generate_vector_lookup_table(lookup_table: dict) -> dict:
 
 def main():
     if len(sys.argv) == 1:
-        generate_default_profiles(verbose=True)
+        generate_default_profile(verbose=True)
         return 0
 
     parser = argparse.ArgumentParser(

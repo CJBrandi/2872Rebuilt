@@ -128,7 +128,7 @@ public class Turret {
                   Timer.getFPGATimestamp(), inputs.motorEncoderPosition));
 
       logState();
-      TurretVisualizer.update(setpoint.position);
+      TurretVisualizer.update(inputs.motorEncoderPosition.getRadians());
       return;
     }
 
@@ -201,7 +201,7 @@ public class Turret {
     }
 
     logState();
-    TurretVisualizer.update(setpoint.position);
+    TurretVisualizer.update(inputs.motorEncoderPosition.getRadians());
   }
 
   private TurretLimits.Selection selectAngleWithinLimits(double robotRelativeGoalRad) {
@@ -329,21 +329,6 @@ public class Turret {
     targetTurretAngle = null;
     targetVelocityRadPerSec = 0.0;
     turretIO.stop();
-  }
-
-  /** Resets the turret encoder position and profile setpoint to the specified angle in degrees. */
-  public void resetPosition(double degrees) {
-    double safeRadians =
-        TurretLimits.findBestAngleWithinLimitsRadians(
-            Units.degreesToRadians(degrees), lastGoalAngle);
-    double safeDegrees = Units.radiansToDegrees(safeRadians);
-
-    turretIO.setPosition(safeDegrees);
-    setpoint = new TrapezoidProfile.State(safeRadians, 0.0);
-    lastGoalAngle = safeRadians;
-
-    Logger.recordOutput("Turret/Safety/ResetRequestedDeg", degrees);
-    Logger.recordOutput("Turret/Safety/ResetAppliedDeg", safeDegrees);
   }
 
   /** Returns whether the motor is connected. */

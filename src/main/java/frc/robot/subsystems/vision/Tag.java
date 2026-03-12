@@ -109,7 +109,7 @@ public class Tag extends SubsystemBase {
       // Loop over pose observations
       for (var observation : inputs[cameraIndex].poseObservations) {
         boolean rejectPose;
-        if (strictFilter.get() > 0.5) {
+        if (strictFilter.get() > 0.5 || RobotState.getInstance().isStrictPoseEstimation()) {
           rejectPose =
               observation.tagCount() == 0 // Must have at least one tag
                   || (observation.tagCount() == 1
@@ -127,7 +127,7 @@ public class Tag extends SubsystemBase {
                           .toPose2d()
                           .getTranslation()
                           .getDistance(RobotState.getInstance().getRobotPose().getTranslation())
-                      > 0.1;
+                      > 0.5;
         } else {
           rejectPose =
               observation.tagCount() == 0 // Must have at least one tag

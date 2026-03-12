@@ -8,7 +8,6 @@ public interface TurretIO {
   class TurretIOInputs {
     public boolean motorConnected = true;
     public boolean encoderConnected = true;
-    public boolean[] hallEffectState = new boolean[3];
 
     public Rotation2d motorEncoderPosition = new Rotation2d();
     public double velocityRadPerSec = 0.0;

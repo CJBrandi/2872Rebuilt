@@ -7,11 +7,13 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.math.system.NumericalIntegration;
 import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 public class TurretIOSim implements TurretIO {
-  private static final double moi = 0.001;
+  // Keep the turret intentionally more responsive in desktop sim to reduce iteration time.
+  private static final double moi = 0.0005;
+  private static final double simMaxTorqueCurrentAmps = 120.0;
+  private static final double nominalVoltage = 12.0;
 
   // Hall effect sensor positions (degrees) and detection tolerance
   private static final double HALL_TOLERANCE_DEG = 2.0;
@@ -38,7 +40,7 @@ public class TurretIOSim implements TurretIO {
   private boolean closedLoop = false;
 
   public TurretIOSim() {
-    simState = VecBuilder.fill(0.0, 0.0);
+    simState = VecBuilder.fill(Math.toRadians(-180.0), 0.0);
   }
 
   @Override
@@ -49,7 +51,7 @@ public class TurretIOSim implements TurretIO {
     } else {
       // Run control at 1kHz
       for (int i = 0; i < Constants.loopPeriodSecs / (1.0 / 1000.0); i++) {
-        setInputTorqueCurrent(controller.calculate(simState.get(0)) + feedforward);
+        setInputVoltage(controller.calculate(simState.get(0)) + feedforward);
         update(1.0 / 1000.0);
       }
     }
@@ -61,31 +63,12 @@ public class TurretIOSim implements TurretIO {
     inputs.appliedVolts = appliedVolts;
     inputs.currentAmps = Math.abs(inputTorqueCurrent);
     inputs.tempCelsius = 0.0;
-
-    // Simulate hall effect sensors
-    double positionDeg = Units.radiansToDegrees(simState.get(0));
-    inputs.hallEffectState[0] =
-        Math.abs(
-                positionDeg
-                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.leftHall)
-            < HALL_TOLERANCE_DEG;
-    inputs.hallEffectState[1] =
-        Math.abs(
-                positionDeg
-                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees
-                        .middleHall)
-            < HALL_TOLERANCE_DEG;
-    inputs.hallEffectState[2] =
-        Math.abs(
-                positionDeg
-                    - Constants.SuperstructureConstants.TurretConstants.HallEffectDegrees.rightHall)
-            < HALL_TOLERANCE_DEG;
   }
 
   @Override
   public void runOpenLoop(double output) {
     closedLoop = false;
-    setInputTorqueCurrent(output);
+    setInputVoltage(output * nominalVoltage);
   }
 
   @Override
@@ -123,13 +106,16 @@ public class TurretIOSim implements TurretIO {
   }
 
   private void setInputTorqueCurrent(double torqueCurrent) {
-    inputTorqueCurrent = MathUtil.clamp(torqueCurrent, -40.0, 40.0);
+    inputTorqueCurrent =
+        MathUtil.clamp(torqueCurrent, -simMaxTorqueCurrentAmps, simMaxTorqueCurrentAmps);
     appliedVolts = gearbox.getVoltage(gearbox.getTorque(inputTorqueCurrent), simState.get(1, 0));
-    appliedVolts = MathUtil.clamp(appliedVolts, -12.0, 12.0);
+    appliedVolts = MathUtil.clamp(appliedVolts, -nominalVoltage, nominalVoltage);
   }
 
   private void setInputVoltage(double voltage) {
-    setInputTorqueCurrent(gearbox.getCurrent(simState.get(1, 0), voltage));
+    setInputTorqueCurrent(
+        gearbox.getCurrent(
+            simState.get(1, 0), MathUtil.clamp(voltage, -nominalVoltage, nominalVoltage)));
   }
 
   private void update(double dt) {

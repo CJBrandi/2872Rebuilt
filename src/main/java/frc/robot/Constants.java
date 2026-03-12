@@ -18,8 +18,7 @@ import lombok.Getter;
  */
 public final class Constants {
   public static final double loopPeriodSecs = 0.02;
-  public static final Mode simMode = Mode.REAL;
-  @Getter public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : simMode;
+  @Getter public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : Mode.SIM;
   public static final boolean tuningMode = true;
   public static boolean disableHAL = false;
 
@@ -99,14 +98,8 @@ public final class Constants {
       public static final int canId = 60;
       public static final String canBus = "";
       public static final double reduction = 40.66;
-      public static final double minAngleDeg = -200.0;
-      public static final double maxAngleDeg = 0.0;
-
-      public static class HallEffectDegrees {
-        public static final double leftHall = 120;
-        public static final double middleHall = 0;
-        public static final double rightHall = 240;
-      }
+      public static final double minAngleDeg = -385.0;
+      public static final double maxAngleDeg = 25.0;
     }
 
     public static class ShooterConstants {

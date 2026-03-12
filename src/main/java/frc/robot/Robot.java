@@ -132,6 +132,8 @@ public class Robot extends LoggedRobot {
   public void teleopInit() {
     HubShiftUtil.initialize();
     scheduleHomingOncePerBoot();
+    RobotState.getInstance().setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM);
+    RobotState.getInstance().setAutoEmpty(false);
 
     if (autonomousCommand != null) {
       autonomousCommand.cancel();

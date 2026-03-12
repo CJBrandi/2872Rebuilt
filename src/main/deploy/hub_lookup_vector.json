@@ -20,7 +20,7 @@
   },
   "range": {
     "min_distance_m": 1.5,
-    "max_distance_m": 6.0,
+    "max_distance_m": 16.0,
     "step_m": 0.1
   },
   "entries": [
@@ -619,6 +619,1306 @@
       "speed_mps": 9.5765,
       "pitch_rad": 1.087646,
       "flight_time": 1.5206,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.1,
+      "velocity_vector_mps": {
+        "x": 4.49811,
+        "y": 0.0,
+        "z": 8.53403
+      },
+      "speed_mps": 9.6469,
+      "pitch_rad": 1.085721,
+      "flight_time": 1.5313,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.2,
+      "velocity_vector_mps": {
+        "x": 4.54703,
+        "y": 0.0,
+        "z": 8.58736
+      },
+      "speed_mps": 9.7169,
+      "pitch_rad": 1.083826,
+      "flight_time": 1.5419,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.3,
+      "velocity_vector_mps": {
+        "x": 4.59581,
+        "y": 0.0,
+        "z": 8.64049
+      },
+      "speed_mps": 9.7867,
+      "pitch_rad": 1.081961,
+      "flight_time": 1.5524,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.4,
+      "velocity_vector_mps": {
+        "x": 4.64443,
+        "y": 0.0,
+        "z": 8.69333
+      },
+      "speed_mps": 9.8562,
+      "pitch_rad": 1.080124,
+      "flight_time": 1.5628,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.5,
+      "velocity_vector_mps": {
+        "x": 4.69287,
+        "y": 0.0,
+        "z": 8.74589
+      },
+      "speed_mps": 9.9254,
+      "pitch_rad": 1.078315,
+      "flight_time": 1.5731,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.6,
+      "velocity_vector_mps": {
+        "x": 4.74118,
+        "y": 0.0,
+        "z": 8.79825
+      },
+      "speed_mps": 9.9944,
+      "pitch_rad": 1.076532,
+      "flight_time": 1.5834,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.7,
+      "velocity_vector_mps": {
+        "x": 4.78929,
+        "y": 0.0,
+        "z": 8.85023
+      },
+      "speed_mps": 10.063,
+      "pitch_rad": 1.074774,
+      "flight_time": 1.5935,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.8,
+      "velocity_vector_mps": {
+        "x": 4.83729,
+        "y": 0.0,
+        "z": 8.90202
+      },
+      "speed_mps": 10.1314,
+      "pitch_rad": 1.07304,
+      "flight_time": 1.6036,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 6.9,
+      "velocity_vector_mps": {
+        "x": 4.88518,
+        "y": 0.0,
+        "z": 8.95359
+      },
+      "speed_mps": 10.1996,
+      "pitch_rad": 1.071329,
+      "flight_time": 1.6136,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.0,
+      "velocity_vector_mps": {
+        "x": 4.93291,
+        "y": 0.0,
+        "z": 9.00489
+      },
+      "speed_mps": 10.2675,
+      "pitch_rad": 1.069641,
+      "flight_time": 1.6235,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.1,
+      "velocity_vector_mps": {
+        "x": 4.98048,
+        "y": 0.0,
+        "z": 9.05589
+      },
+      "speed_mps": 10.3351,
+      "pitch_rad": 1.067975,
+      "flight_time": 1.6333,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.2,
+      "velocity_vector_mps": {
+        "x": 5.02796,
+        "y": 0.0,
+        "z": 9.10668
+      },
+      "speed_mps": 10.4025,
+      "pitch_rad": 1.066329,
+      "flight_time": 1.6431,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.3,
+      "velocity_vector_mps": {
+        "x": 5.07533,
+        "y": 0.0,
+        "z": 9.15727
+      },
+      "speed_mps": 10.4697,
+      "pitch_rad": 1.064703,
+      "flight_time": 1.6528,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.4,
+      "velocity_vector_mps": {
+        "x": 5.12256,
+        "y": 0.0,
+        "z": 9.20757
+      },
+      "speed_mps": 10.5366,
+      "pitch_rad": 1.063097,
+      "flight_time": 1.6624,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.5,
+      "velocity_vector_mps": {
+        "x": 5.16969,
+        "y": 0.0,
+        "z": 9.25766
+      },
+      "speed_mps": 10.6033,
+      "pitch_rad": 1.061509,
+      "flight_time": 1.6719,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.6,
+      "velocity_vector_mps": {
+        "x": 5.21674,
+        "y": 0.0,
+        "z": 9.30754
+      },
+      "speed_mps": 10.6698,
+      "pitch_rad": 1.059939,
+      "flight_time": 1.6813,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.7,
+      "velocity_vector_mps": {
+        "x": 5.26363,
+        "y": 0.0,
+        "z": 9.35713
+      },
+      "speed_mps": 10.736,
+      "pitch_rad": 1.058387,
+      "flight_time": 1.6907,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.8,
+      "velocity_vector_mps": {
+        "x": 5.31049,
+        "y": 0.0,
+        "z": 9.4066
+      },
+      "speed_mps": 10.8021,
+      "pitch_rad": 1.056851,
+      "flight_time": 1.7,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 7.9,
+      "velocity_vector_mps": {
+        "x": 5.35721,
+        "y": 0.0,
+        "z": 9.45577
+      },
+      "speed_mps": 10.8679,
+      "pitch_rad": 1.055332,
+      "flight_time": 1.7093,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.0,
+      "velocity_vector_mps": {
+        "x": 5.4039,
+        "y": 0.0,
+        "z": 9.50481
+      },
+      "speed_mps": 10.9336,
+      "pitch_rad": 1.053828,
+      "flight_time": 1.7185,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.1,
+      "velocity_vector_mps": {
+        "x": 5.45044,
+        "y": 0.0,
+        "z": 9.55357
+      },
+      "speed_mps": 10.999,
+      "pitch_rad": 1.05234,
+      "flight_time": 1.7276,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.2,
+      "velocity_vector_mps": {
+        "x": 5.49691,
+        "y": 0.0,
+        "z": 9.60211
+      },
+      "speed_mps": 11.0642,
+      "pitch_rad": 1.050866,
+      "flight_time": 1.7367,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.3,
+      "velocity_vector_mps": {
+        "x": 5.54335,
+        "y": 0.0,
+        "z": 9.65052
+      },
+      "speed_mps": 11.1293,
+      "pitch_rad": 1.049406,
+      "flight_time": 1.7456,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.4,
+      "velocity_vector_mps": {
+        "x": 5.58966,
+        "y": 0.0,
+        "z": 9.69864
+      },
+      "speed_mps": 11.1941,
+      "pitch_rad": 1.04796,
+      "flight_time": 1.7546,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.5,
+      "velocity_vector_mps": {
+        "x": 5.63593,
+        "y": 0.0,
+        "z": 9.74664
+      },
+      "speed_mps": 11.2588,
+      "pitch_rad": 1.046528,
+      "flight_time": 1.7634,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.6,
+      "velocity_vector_mps": {
+        "x": 5.68213,
+        "y": 0.0,
+        "z": 9.79441
+      },
+      "speed_mps": 11.3233,
+      "pitch_rad": 1.045108,
+      "flight_time": 1.7722,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.7,
+      "velocity_vector_mps": {
+        "x": 5.72825,
+        "y": 0.0,
+        "z": 9.84198
+      },
+      "speed_mps": 11.3876,
+      "pitch_rad": 1.043701,
+      "flight_time": 1.781,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.8,
+      "velocity_vector_mps": {
+        "x": 5.77429,
+        "y": 0.0,
+        "z": 9.88934
+      },
+      "speed_mps": 11.4517,
+      "pitch_rad": 1.042306,
+      "flight_time": 1.7897,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 8.9,
+      "velocity_vector_mps": {
+        "x": 5.82032,
+        "y": 0.0,
+        "z": 9.93656
+      },
+      "speed_mps": 11.5157,
+      "pitch_rad": 1.040922,
+      "flight_time": 1.7983,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.0,
+      "velocity_vector_mps": {
+        "x": 5.86627,
+        "y": 0.0,
+        "z": 9.98357
+      },
+      "speed_mps": 11.5795,
+      "pitch_rad": 1.03955,
+      "flight_time": 1.8069,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.1,
+      "velocity_vector_mps": {
+        "x": 5.91215,
+        "y": 0.0,
+        "z": 10.03037
+      },
+      "speed_mps": 11.6431,
+      "pitch_rad": 1.038189,
+      "flight_time": 1.8154,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.2,
+      "velocity_vector_mps": {
+        "x": 5.958,
+        "y": 0.0,
+        "z": 10.07704
+      },
+      "speed_mps": 11.7066,
+      "pitch_rad": 1.036839,
+      "flight_time": 1.8238,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.3,
+      "velocity_vector_mps": {
+        "x": 6.00378,
+        "y": 0.0,
+        "z": 10.1235
+      },
+      "speed_mps": 11.7699,
+      "pitch_rad": 1.0355,
+      "flight_time": 1.8322,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.4,
+      "velocity_vector_mps": {
+        "x": 6.04955,
+        "y": 0.0,
+        "z": 10.16982
+      },
+      "speed_mps": 11.8331,
+      "pitch_rad": 1.03417,
+      "flight_time": 1.8406,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.5,
+      "velocity_vector_mps": {
+        "x": 6.09525,
+        "y": 0.0,
+        "z": 10.21593
+      },
+      "speed_mps": 11.8961,
+      "pitch_rad": 1.03285,
+      "flight_time": 1.8489,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.6,
+      "velocity_vector_mps": {
+        "x": 6.14087,
+        "y": 0.0,
+        "z": 10.26182
+      },
+      "speed_mps": 11.9589,
+      "pitch_rad": 1.03154,
+      "flight_time": 1.8571,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.7,
+      "velocity_vector_mps": {
+        "x": 6.18653,
+        "y": 0.0,
+        "z": 10.30767
+      },
+      "speed_mps": 12.0217,
+      "pitch_rad": 1.030239,
+      "flight_time": 1.8653,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.8,
+      "velocity_vector_mps": {
+        "x": 6.23208,
+        "y": 0.0,
+        "z": 10.35322
+      },
+      "speed_mps": 12.0842,
+      "pitch_rad": 1.028947,
+      "flight_time": 1.8734,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 9.9,
+      "velocity_vector_mps": {
+        "x": 6.27766,
+        "y": 0.0,
+        "z": 10.39872
+      },
+      "speed_mps": 12.1467,
+      "pitch_rad": 1.027664,
+      "flight_time": 1.8815,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.0,
+      "velocity_vector_mps": {
+        "x": 6.32317,
+        "y": 0.0,
+        "z": 10.444
+      },
+      "speed_mps": 12.209,
+      "pitch_rad": 1.02639,
+      "flight_time": 1.8896,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.1,
+      "velocity_vector_mps": {
+        "x": 6.36867,
+        "y": 0.0,
+        "z": 10.48916
+      },
+      "speed_mps": 12.2712,
+      "pitch_rad": 1.025124,
+      "flight_time": 1.8975,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.2,
+      "velocity_vector_mps": {
+        "x": 6.4141,
+        "y": 0.0,
+        "z": 10.53409
+      },
+      "speed_mps": 12.3332,
+      "pitch_rad": 1.023866,
+      "flight_time": 1.9055,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.3,
+      "velocity_vector_mps": {
+        "x": 6.45953,
+        "y": 0.0,
+        "z": 10.57889
+      },
+      "speed_mps": 12.3951,
+      "pitch_rad": 1.022615,
+      "flight_time": 1.9134,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.4,
+      "velocity_vector_mps": {
+        "x": 6.50494,
+        "y": 0.0,
+        "z": 10.62357
+      },
+      "speed_mps": 12.4569,
+      "pitch_rad": 1.021373,
+      "flight_time": 1.9212,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.5,
+      "velocity_vector_mps": {
+        "x": 6.55034,
+        "y": 0.0,
+        "z": 10.6681
+      },
+      "speed_mps": 12.5186,
+      "pitch_rad": 1.020138,
+      "flight_time": 1.929,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.6,
+      "velocity_vector_mps": {
+        "x": 6.59573,
+        "y": 0.0,
+        "z": 10.71251
+      },
+      "speed_mps": 12.5802,
+      "pitch_rad": 1.01891,
+      "flight_time": 1.9368,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.7,
+      "velocity_vector_mps": {
+        "x": 6.64106,
+        "y": 0.0,
+        "z": 10.75669
+      },
+      "speed_mps": 12.6416,
+      "pitch_rad": 1.017689,
+      "flight_time": 1.9445,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.8,
+      "velocity_vector_mps": {
+        "x": 6.68637,
+        "y": 0.0,
+        "z": 10.80075
+      },
+      "speed_mps": 12.7029,
+      "pitch_rad": 1.016476,
+      "flight_time": 1.9521,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 10.9,
+      "velocity_vector_mps": {
+        "x": 6.73168,
+        "y": 0.0,
+        "z": 10.84467
+      },
+      "speed_mps": 12.7641,
+      "pitch_rad": 1.015269,
+      "flight_time": 1.9598,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.0,
+      "velocity_vector_mps": {
+        "x": 6.77698,
+        "y": 0.0,
+        "z": 10.88845
+      },
+      "speed_mps": 12.8252,
+      "pitch_rad": 1.014068,
+      "flight_time": 1.9673,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.1,
+      "velocity_vector_mps": {
+        "x": 6.82227,
+        "y": 0.0,
+        "z": 10.9321
+      },
+      "speed_mps": 12.8862,
+      "pitch_rad": 1.012874,
+      "flight_time": 1.9749,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.2,
+      "velocity_vector_mps": {
+        "x": 6.86755,
+        "y": 0.0,
+        "z": 10.97562
+      },
+      "speed_mps": 12.9471,
+      "pitch_rad": 1.011687,
+      "flight_time": 1.9824,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.3,
+      "velocity_vector_mps": {
+        "x": 6.91283,
+        "y": 0.0,
+        "z": 11.019
+      },
+      "speed_mps": 13.0079,
+      "pitch_rad": 1.010505,
+      "flight_time": 1.9898,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.4,
+      "velocity_vector_mps": {
+        "x": 6.9581,
+        "y": 0.0,
+        "z": 11.06224
+      },
+      "speed_mps": 13.0686,
+      "pitch_rad": 1.009329,
+      "flight_time": 1.9972,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.5,
+      "velocity_vector_mps": {
+        "x": 7.00335,
+        "y": 0.0,
+        "z": 11.10536
+      },
+      "speed_mps": 13.1292,
+      "pitch_rad": 1.00816,
+      "flight_time": 2.0046,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.6,
+      "velocity_vector_mps": {
+        "x": 7.0486,
+        "y": 0.0,
+        "z": 11.14833
+      },
+      "speed_mps": 13.1897,
+      "pitch_rad": 1.006996,
+      "flight_time": 2.0119,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.7,
+      "velocity_vector_mps": {
+        "x": 7.09386,
+        "y": 0.0,
+        "z": 11.19117
+      },
+      "speed_mps": 13.2501,
+      "pitch_rad": 1.005837,
+      "flight_time": 2.0192,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.8,
+      "velocity_vector_mps": {
+        "x": 7.1391,
+        "y": 0.0,
+        "z": 11.23388
+      },
+      "speed_mps": 13.3104,
+      "pitch_rad": 1.004684,
+      "flight_time": 2.0264,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 11.9,
+      "velocity_vector_mps": {
+        "x": 7.18434,
+        "y": 0.0,
+        "z": 11.27645
+      },
+      "speed_mps": 13.3706,
+      "pitch_rad": 1.003536,
+      "flight_time": 2.0336,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.0,
+      "velocity_vector_mps": {
+        "x": 7.22957,
+        "y": 0.0,
+        "z": 11.31888
+      },
+      "speed_mps": 13.4307,
+      "pitch_rad": 1.002393,
+      "flight_time": 2.0408,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.1,
+      "velocity_vector_mps": {
+        "x": 7.27479,
+        "y": 0.0,
+        "z": 11.36118
+      },
+      "speed_mps": 13.4907,
+      "pitch_rad": 1.001256,
+      "flight_time": 2.0479,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.2,
+      "velocity_vector_mps": {
+        "x": 7.32007,
+        "y": 0.0,
+        "z": 11.40342
+      },
+      "speed_mps": 13.5507,
+      "pitch_rad": 1.000123,
+      "flight_time": 2.055,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.3,
+      "velocity_vector_mps": {
+        "x": 7.36535,
+        "y": 0.0,
+        "z": 11.44553
+      },
+      "speed_mps": 13.6106,
+      "pitch_rad": 0.998995,
+      "flight_time": 2.062,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.4,
+      "velocity_vector_mps": {
+        "x": 7.41061,
+        "y": 0.0,
+        "z": 11.4875
+      },
+      "speed_mps": 13.6704,
+      "pitch_rad": 0.997872,
+      "flight_time": 2.0691,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.5,
+      "velocity_vector_mps": {
+        "x": 7.45587,
+        "y": 0.0,
+        "z": 11.52934
+      },
+      "speed_mps": 13.7301,
+      "pitch_rad": 0.996754,
+      "flight_time": 2.076,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.6,
+      "velocity_vector_mps": {
+        "x": 7.50113,
+        "y": 0.0,
+        "z": 11.57104
+      },
+      "speed_mps": 13.7897,
+      "pitch_rad": 0.99564,
+      "flight_time": 2.083,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.7,
+      "velocity_vector_mps": {
+        "x": 7.54643,
+        "y": 0.0,
+        "z": 11.61269
+      },
+      "speed_mps": 13.8493,
+      "pitch_rad": 0.994531,
+      "flight_time": 2.0899,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.8,
+      "velocity_vector_mps": {
+        "x": 7.59169,
+        "y": 0.0,
+        "z": 11.6541
+      },
+      "speed_mps": 13.9087,
+      "pitch_rad": 0.993425,
+      "flight_time": 2.0967,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 12.9,
+      "velocity_vector_mps": {
+        "x": 7.63704,
+        "y": 0.0,
+        "z": 11.69557
+      },
+      "speed_mps": 13.9682,
+      "pitch_rad": 0.992325,
+      "flight_time": 2.1036,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.0,
+      "velocity_vector_mps": {
+        "x": 7.68234,
+        "y": 0.0,
+        "z": 11.7368
+      },
+      "speed_mps": 14.0275,
+      "pitch_rad": 0.991228,
+      "flight_time": 2.1104,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.1,
+      "velocity_vector_mps": {
+        "x": 7.72769,
+        "y": 0.0,
+        "z": 11.77797
+      },
+      "speed_mps": 14.0868,
+      "pitch_rad": 0.990135,
+      "flight_time": 2.1171,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.2,
+      "velocity_vector_mps": {
+        "x": 7.77303,
+        "y": 0.0,
+        "z": 11.81902
+      },
+      "speed_mps": 14.146,
+      "pitch_rad": 0.989047,
+      "flight_time": 2.1238,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.3,
+      "velocity_vector_mps": {
+        "x": 7.81838,
+        "y": 0.0,
+        "z": 11.85992
+      },
+      "speed_mps": 14.2051,
+      "pitch_rad": 0.987962,
+      "flight_time": 2.1305,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.4,
+      "velocity_vector_mps": {
+        "x": 7.86378,
+        "y": 0.0,
+        "z": 11.90077
+      },
+      "speed_mps": 14.2642,
+      "pitch_rad": 0.986881,
+      "flight_time": 2.1372,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.5,
+      "velocity_vector_mps": {
+        "x": 7.90917,
+        "y": 0.0,
+        "z": 11.94149
+      },
+      "speed_mps": 14.3232,
+      "pitch_rad": 0.985804,
+      "flight_time": 2.1438,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.6,
+      "velocity_vector_mps": {
+        "x": 7.95461,
+        "y": 0.0,
+        "z": 11.98215
+      },
+      "speed_mps": 14.3822,
+      "pitch_rad": 0.984731,
+      "flight_time": 2.1504,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.7,
+      "velocity_vector_mps": {
+        "x": 8.00006,
+        "y": 0.0,
+        "z": 12.02266
+      },
+      "speed_mps": 14.4411,
+      "pitch_rad": 0.983661,
+      "flight_time": 2.157,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.8,
+      "velocity_vector_mps": {
+        "x": 8.04556,
+        "y": 0.0,
+        "z": 12.06312
+      },
+      "speed_mps": 14.5,
+      "pitch_rad": 0.982594,
+      "flight_time": 2.1635,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 13.9,
+      "velocity_vector_mps": {
+        "x": 8.09099,
+        "y": 0.0,
+        "z": 12.10337
+      },
+      "speed_mps": 14.5587,
+      "pitch_rad": 0.981532,
+      "flight_time": 2.17,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.0,
+      "velocity_vector_mps": {
+        "x": 8.13655,
+        "y": 0.0,
+        "z": 12.14364
+      },
+      "speed_mps": 14.6175,
+      "pitch_rad": 0.980472,
+      "flight_time": 2.1765,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.1,
+      "velocity_vector_mps": {
+        "x": 8.18209,
+        "y": 0.0,
+        "z": 12.18377
+      },
+      "speed_mps": 14.6762,
+      "pitch_rad": 0.979416,
+      "flight_time": 2.1829,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.2,
+      "velocity_vector_mps": {
+        "x": 8.22764,
+        "y": 0.0,
+        "z": 12.22376
+      },
+      "speed_mps": 14.7348,
+      "pitch_rad": 0.978363,
+      "flight_time": 2.1893,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.3,
+      "velocity_vector_mps": {
+        "x": 8.27323,
+        "y": 0.0,
+        "z": 12.2637
+      },
+      "speed_mps": 14.7934,
+      "pitch_rad": 0.977314,
+      "flight_time": 2.1957,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.4,
+      "velocity_vector_mps": {
+        "x": 8.31883,
+        "y": 0.0,
+        "z": 12.3035
+      },
+      "speed_mps": 14.8519,
+      "pitch_rad": 0.976267,
+      "flight_time": 2.202,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.5,
+      "velocity_vector_mps": {
+        "x": 8.36448,
+        "y": 0.0,
+        "z": 12.34324
+      },
+      "speed_mps": 14.9104,
+      "pitch_rad": 0.975224,
+      "flight_time": 2.2083,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.6,
+      "velocity_vector_mps": {
+        "x": 8.41012,
+        "y": 0.0,
+        "z": 12.38285
+      },
+      "speed_mps": 14.9688,
+      "pitch_rad": 0.974184,
+      "flight_time": 2.2146,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.7,
+      "velocity_vector_mps": {
+        "x": 8.45583,
+        "y": 0.0,
+        "z": 12.42239
+      },
+      "speed_mps": 15.0272,
+      "pitch_rad": 0.973146,
+      "flight_time": 2.2208,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.8,
+      "velocity_vector_mps": {
+        "x": 8.50158,
+        "y": 0.0,
+        "z": 12.46188
+      },
+      "speed_mps": 15.0856,
+      "pitch_rad": 0.972112,
+      "flight_time": 2.2271,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 14.9,
+      "velocity_vector_mps": {
+        "x": 8.54734,
+        "y": 0.0,
+        "z": 12.50123
+      },
+      "speed_mps": 15.1439,
+      "pitch_rad": 0.97108,
+      "flight_time": 2.2333,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.0,
+      "velocity_vector_mps": {
+        "x": 8.59314,
+        "y": 0.0,
+        "z": 12.54052
+      },
+      "speed_mps": 15.2022,
+      "pitch_rad": 0.970052,
+      "flight_time": 2.2394,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.1,
+      "velocity_vector_mps": {
+        "x": 8.63895,
+        "y": 0.0,
+        "z": 12.57968
+      },
+      "speed_mps": 15.2604,
+      "pitch_rad": 0.969026,
+      "flight_time": 2.2455,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.2,
+      "velocity_vector_mps": {
+        "x": 8.68481,
+        "y": 0.0,
+        "z": 12.61878
+      },
+      "speed_mps": 15.3186,
+      "pitch_rad": 0.968003,
+      "flight_time": 2.2517,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.3,
+      "velocity_vector_mps": {
+        "x": 8.73068,
+        "y": 0.0,
+        "z": 12.65773
+      },
+      "speed_mps": 15.3767,
+      "pitch_rad": 0.966982,
+      "flight_time": 2.2577,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.4,
+      "velocity_vector_mps": {
+        "x": 8.77666,
+        "y": 0.0,
+        "z": 12.69671
+      },
+      "speed_mps": 15.4349,
+      "pitch_rad": 0.965964,
+      "flight_time": 2.2638,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.5,
+      "velocity_vector_mps": {
+        "x": 8.82257,
+        "y": 0.0,
+        "z": 12.73547
+      },
+      "speed_mps": 15.4929,
+      "pitch_rad": 0.964949,
+      "flight_time": 2.2698,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.6,
+      "velocity_vector_mps": {
+        "x": 8.8686,
+        "y": 0.0,
+        "z": 12.77425
+      },
+      "speed_mps": 15.551,
+      "pitch_rad": 0.963936,
+      "flight_time": 2.2758,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.7,
+      "velocity_vector_mps": {
+        "x": 8.91462,
+        "y": 0.0,
+        "z": 12.8129
+      },
+      "speed_mps": 15.609,
+      "pitch_rad": 0.962926,
+      "flight_time": 2.2818,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.8,
+      "velocity_vector_mps": {
+        "x": 8.9607,
+        "y": 0.0,
+        "z": 12.85148
+      },
+      "speed_mps": 15.667,
+      "pitch_rad": 0.961918,
+      "flight_time": 2.2877,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 15.9,
+      "velocity_vector_mps": {
+        "x": 9.00684,
+        "y": 0.0,
+        "z": 12.89002
+      },
+      "speed_mps": 15.725,
+      "pitch_rad": 0.960913,
+      "flight_time": 2.2936,
+      "entry_angle_deg": 30.0,
+      "entry_constraint_deg": 30.0
+    },
+    {
+      "distance": 16.0,
+      "velocity_vector_mps": {
+        "x": 9.05297,
+        "y": 0.0,
+        "z": 12.9284
+      },
+      "speed_mps": 15.7829,
+      "pitch_rad": 0.95991,
+      "flight_time": 2.2995,
       "entry_angle_deg": 30.0,
       "entry_constraint_deg": 30.0
     }

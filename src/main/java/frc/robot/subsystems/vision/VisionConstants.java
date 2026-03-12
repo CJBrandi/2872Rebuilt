@@ -19,25 +19,29 @@ public class VisionConstants {
   public static AprilTagFieldLayout aprilTagLayout =
       AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
 
+  public static final Translation3d robotCenterToTurretAxisAtZero =
+      new Translation3d(Units.inchesToMeters(0.25), 0.0, 0.419);
+  public static final Translation3d turretAxisToCameraAtZero =
+      new Translation3d(Units.inchesToMeters(8.532), 0.0, 0.0);
+  public static final Rotation3d turretCameraRotationAtZero = new Rotation3d(0.0, -0.2261799, 0.0);
+
   // Tag camera configurations
   public static final TagCameraConfig camera0Config =
       TagCameraConfig.turretMounted(
           "camera_0",
           new TagCameraConfig.TurretMountSettings(
-              new Translation3d(Units.inchesToMeters(0.25), 0.0, 0.419),
-              new Translation3d(Units.inchesToMeters(8.532), 0.0, 0.0),
-              new Rotation3d(0.0, -0.2261799, 0.0)),
-          1.0);
+              robotCenterToTurretAxisAtZero, turretAxisToCameraAtZero, turretCameraRotationAtZero),
+          2.0);
 
   public static final TagCameraConfig camera1Config =
       TagCameraConfig.fixed(
           "camera_1",
           new Transform3d(
-              Units.inchesToMeters(-13.426), // 13.426
-              Units.inchesToMeters(-5.957), // 5.957
-              Units.inchesToMeters(16.421), // 16.421
-              new Rotation3d(0.0, Units.degreesToRadians(-15), Units.degreesToRadians(45))),
-          1.0);
+              Units.inchesToMeters(11.141),
+              Units.inchesToMeters(11.141),
+              Units.inchesToMeters(6.498),
+              new Rotation3d(0.0, Units.degreesToRadians(-25), Units.degreesToRadians(45))),
+          2.0);
 
   public static final TagCameraConfig[] tagCameraConfigs =
       new TagCameraConfig[] {camera0Config, camera1Config};

@@ -9,7 +9,6 @@ package frc.robot;
 
 import static frc.robot.subsystems.vision.VisionConstants.*;
 
-import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -17,6 +16,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -39,6 +39,7 @@ import frc.robot.subsystems.superstructure.turret.TurretIO;
 import frc.robot.subsystems.superstructure.turret.TurretIOSim;
 import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
 import frc.robot.subsystems.vision.*;
+import frc.robot.util.Autos;
 import frc.robot.util.FuelSim;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
@@ -59,11 +60,11 @@ public class RobotContainer {
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
-  private static final double SHOT_PERIOD_SECONDS = 1.0 / 15.0; // 15 balls/second
+  private static final double SHOT_PERIOD_SECONDS = 1.0 / 9.0; // 15 balls/second
   private double lastShotTime = 0.0;
 
-  // Dashboard inputs
-  private final LoggedDashboardChooser<Command> autoChooser;
+  private final LoggedDashboardChooser<Command> characterizer;
+  private final LoggedDashboardChooser<Command> auto;
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -72,7 +73,7 @@ public class RobotContainer {
             timestampSeconds -> RobotState.getInstance().getTurretAngleAtTime(timestampSeconds));
     TagCameraConfig runtimeCamera1Config = camera1Config;
 
-    switch (Constants.currentMode) {
+    switch (Constants.getCurrentMode()) {
       case REAL:
         drive =
             new Drive(
@@ -150,8 +151,8 @@ public class RobotContainer {
         tag =
             new Tag(
                 drive::addVisionMeasurement,
-                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose),
-                new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose));
+                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose));
+        // new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose);
         detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
         break;
 
@@ -179,7 +180,6 @@ public class RobotContainer {
         detection = new Detection(drive::getPose, new DetectionIO() {});
         break;
     }
-
     // Initialize FuelSim in simulation mode
     if (Constants.currentMode == Constants.Mode.SIM) {
       FuelSim fuelSim = FuelSim.getInstance();
@@ -232,7 +232,7 @@ public class RobotContainer {
       superstructure.setDefaultCommand(
           Commands.run(
               () -> {
-                if (superstructure.isReadyToShoot()) {
+                if (RobotState.getInstance().isAutoEmpty()) {
                   double currentTime = Timer.getFPGATimestamp();
                   if (currentTime - lastShotTime >= SHOT_PERIOD_SECONDS) {
                     superstructure.launchFuelSim();
@@ -241,54 +241,68 @@ public class RobotContainer {
                 }
               },
               superstructure));
+
+      controller
+          .button(1)
+          .onTrue(
+              Commands.runOnce(
+                  () ->
+                      RobotState.getInstance()
+                          .setAutoEmpty(!RobotState.getInstance().isAutoEmpty())));
     }
 
-    // Set up auto routines
-    autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
+    Autos autos = new Autos(drive, intake, superstructure);
 
+    // Set up auto routines
+    characterizer = new LoggedDashboardChooser<>("Characterization", new SendableChooser<>());
+    auto = new LoggedDashboardChooser<>("Auto", new SendableChooser<>());
+
+    auto.addOption("Right middle cycle", autos.RIGHT_MID_DOUBLE());
+    auto.addOption("Right middle outpost", autos.RIGHT_MID_OUTPOST_CLIMB());
+    auto.addOption("Test", autos.TEST());
     // Set up SysId routines
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive SysId (Quasistatic Forward)",
         drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive SysId (Quasistatic Reverse)",
         drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Elevator Static Characterization Up", elevator.staticCharacterization(2));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Elevator Static Characterization Down", elevator.staticCharacterization(-2));
-    autoChooser.addOption("Elevator Homing", elevator.homingSequence());
+    characterizer.addOption("Elevator Homing", elevator.homingSequence());
 
     // Hood characterization/homing routines
-    autoChooser.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
-    autoChooser.addOption(
+    characterizer.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
+    characterizer.addOption(
         "Hood Static Characterization",
         superstructure.getShooter().hoodStaticCharacterizationCommand(-2));
 
-    autoChooser.addOption(
+    characterizer.addOption(
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
-    autoChooser.addOption(
+    characterizer.addOption(
         "Indexer Static Characterization", superstructure.getIndexer().staticCharacterization(2.0));
 
     // Hood characterization/homing routines
-    autoChooser.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
-    autoChooser.addOption(
+    characterizer.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
+    characterizer.addOption(
         "Hood Static Characterization",
         superstructure.getShooter().hoodStaticCharacterizationCommand(-2));
 
-    autoChooser.addOption(
+    characterizer.addOption(
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
 
     // Intake characterization
-    autoChooser.addOption(
+    characterizer.addOption(
         "Intake Pivot Static Characterization", intake.staticCharacterization(2.0));
 
     // Configure the button bindings
@@ -308,7 +322,7 @@ public class RobotContainer {
             () -> -controller.getLeftY(),
             () -> -controller.getLeftX(),
             () -> -controller.getRightX(),
-            controller.rightBumper()));
+            controller.a()));
 
     controller
         .b()
@@ -320,21 +334,12 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    controller
-        .a()
-        .onTrue(
-            Commands.runOnce(
-                    () ->
-                        drive.setPose(
-                            new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
-                    drive)
-                .ignoringDisable(true));
-
     controller.povUp().onTrue(Commands.runOnce(intake::stow, intake));
     controller.povDown().onTrue(Commands.runOnce(intake::deploy, intake));
+    controller.leftBumper().onTrue(Commands.runOnce(intake::toggleIntake, intake));
 
     controller
-        .leftBumper()
+        .rightBumper()
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -349,7 +354,7 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return autoChooser.get();
+    return auto.get();
   }
 
   public Command getHomingCommand() {

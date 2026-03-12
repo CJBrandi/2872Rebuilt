@@ -32,9 +32,6 @@ public class TurretIOTalonFX implements TurretIO {
       Constants.SuperstructureConstants.TurretConstants.reduction;
 
   private final TalonFX talon;
-  DigitalInput leftHall = new DigitalInput(2);
-  DigitalInput middleHall = new DigitalInput(0);
-  DigitalInput rightHall = new DigitalInput(1);
 
   // Hall sensors are wired active-low: false means magnet present.
   private static boolean isHallTriggered(DigitalInput input) {
@@ -107,10 +104,6 @@ public class TurretIOTalonFX implements TurretIO {
   public void updateInputs(TurretIOInputs inputs) {
     var status =
         BaseStatusSignal.refreshAll(position, velocity, appliedVolts, current, temperature);
-
-    inputs.hallEffectState[0] = isHallTriggered(leftHall);
-    inputs.hallEffectState[1] = isHallTriggered(middleHall);
-    inputs.hallEffectState[2] = isHallTriggered(rightHall);
 
     inputs.motorConnected = connectedDebouncer.calculate(status.isOK());
     inputs.encoderConnected = inputs.motorConnected;

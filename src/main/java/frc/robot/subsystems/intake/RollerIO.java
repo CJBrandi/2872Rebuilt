@@ -11,7 +11,7 @@ import org.littletonrobotics.junction.AutoLog;
 
 public interface RollerIO {
   @AutoLog
-  static class RollerIOInputs {
+  public static class RollerIOInputs {
     public boolean talonConnected = false;
     public double talonPositionRads = 0.0;
     public double talonVelocityRadsPerSec = 0.0;
