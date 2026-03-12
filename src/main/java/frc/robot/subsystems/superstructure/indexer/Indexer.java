@@ -39,6 +39,22 @@ public class Indexer {
       new LoggedTunableNumber("Manual/IndexerRPM", 0.0);
   private static final LoggedTunableNumber intakeRPM =
       new LoggedTunableNumber("Superstructure/Indexer/IntakeRPM");
+  private static final LoggedTunableNumber jamDetectionCurrentAmps =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/DetectionCurrentAmps");
+  private static final LoggedTunableNumber jamDetectionVelocityRPM =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/DetectionVelocityRPM");
+  private static final LoggedTunableNumber jamDetectionCommandVelocityRPM =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/DetectionCommandVelocityRPM");
+  private static final LoggedTunableNumber jamDetectionTimeSecs =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/DetectionTimeSecs");
+  private static final LoggedTunableNumber unjamReverseCurrentAmps =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/ReverseCurrentAmps");
+  private static final LoggedTunableNumber unjamForwardCurrentAmps =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/ForwardCurrentAmps");
+  private static final LoggedTunableNumber unjamReverseTimeSecs =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/ReverseTimeSecs");
+  private static final LoggedTunableNumber unjamForwardTimeSecs =
+      new LoggedTunableNumber("Superstructure/Indexer/Unjam/ForwardTimeSecs");
 
   static {
     switch (Constants.getCurrentMode()) {
@@ -51,6 +67,14 @@ public class Indexer {
         maxVelocityRadPerSec.initDefault(200.0);
         maxAccelerationRadPerSec2.initDefault(400.0);
         staticCharacterizationVelocityThresh.initDefault(0.1);
+        jamDetectionCurrentAmps.initDefault(30.0);
+        jamDetectionVelocityRPM.initDefault(5.0);
+        jamDetectionCommandVelocityRPM.initDefault(40.0);
+        jamDetectionTimeSecs.initDefault(0.15);
+        unjamReverseCurrentAmps.initDefault(40.0);
+        unjamForwardCurrentAmps.initDefault(40.0);
+        unjamReverseTimeSecs.initDefault(0.1);
+        unjamForwardTimeSecs.initDefault(0.08);
       }
       case SIM, REPLAY -> {
         kP.initDefault(6.0);
@@ -61,9 +85,23 @@ public class Indexer {
         maxVelocityRadPerSec.initDefault(300.0);
         maxAccelerationRadPerSec2.initDefault(600.0);
         staticCharacterizationVelocityThresh.initDefault(0.1);
+        jamDetectionCurrentAmps.initDefault(30.0);
+        jamDetectionVelocityRPM.initDefault(5.0);
+        jamDetectionCommandVelocityRPM.initDefault(40.0);
+        jamDetectionTimeSecs.initDefault(0.15);
+        unjamReverseCurrentAmps.initDefault(20.0);
+        unjamForwardCurrentAmps.initDefault(28.0);
+        unjamReverseTimeSecs.initDefault(0.08);
+        unjamForwardTimeSecs.initDefault(0.06);
       }
     }
     intakeRPM.initDefault(70.0);
+  }
+
+  private enum AutoUnjamState {
+    IDLE,
+    REVERSE_PULSE,
+    FORWARD_PULSE
   }
 
   private final IndexerIO io;
@@ -77,6 +115,11 @@ public class Indexer {
   private boolean closedLoop = false;
   private boolean staticCharacterizationActive = false;
   private boolean wasManualMode = false;
+  private boolean profileNeedsReset = false;
+  private AutoUnjamState autoUnjamState = AutoUnjamState.IDLE;
+  private double jamDetectionElapsedSecs = 0.0;
+  private double autoUnjamStateElapsedSecs = 0.0;
+  private double autoUnjamTotalElapsedSecs = 0.0;
 
   @Getter private boolean atSetpoint = false;
 
@@ -117,18 +160,30 @@ public class Indexer {
         maxAccelerationRadPerSec2);
 
     if (closedLoop) {
-      // Move a virtual position target at the desired steady-state velocity and profile towards it.
-      targetPositionRad += targetVelocityRadPerSec * Constants.loopPeriodSecs;
-      var goalState = new TrapezoidProfile.State(targetPositionRad, targetVelocityRadPerSec);
-      setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
-      io.runVelocity(setpoint.velocity);
+      updateAutoUnjamState();
+      if (autoUnjamState == AutoUnjamState.IDLE) {
+        if (profileNeedsReset) {
+          seedProfileFromMeasuredVelocity();
+        }
 
-      atSetpoint =
-          EqualsUtil.epsilonEquals(
-              inputs.velocityRadPerSec,
-              setpoint.velocity,
-              Units.rotationsPerMinuteToRadiansPerSecond(50.0));
+        // Move a virtual position target at the desired steady-state velocity and profile towards
+        // it.
+        targetPositionRad += targetVelocityRadPerSec * Constants.loopPeriodSecs;
+        var goalState = new TrapezoidProfile.State(targetPositionRad, targetVelocityRadPerSec);
+        setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
+        io.runVelocity(setpoint.velocity);
+
+        atSetpoint =
+            EqualsUtil.epsilonEquals(
+                inputs.velocityRadPerSec,
+                setpoint.velocity,
+                Units.rotationsPerMinuteToRadiansPerSecond(50.0));
+      } else {
+        runAutoUnjamOutput();
+        atSetpoint = false;
+      }
     } else {
+      resetAutoUnjamState(false);
       atSetpoint = false;
     }
 
@@ -149,6 +204,14 @@ public class Indexer {
     Logger.recordOutput("Superstructure/Indexer/ManualMode", manualMode);
     Logger.recordOutput("Superstructure/Indexer/Manual/TargetRPM", manualIndexerRPM.get());
     Logger.recordOutput("Superstructure/Indexer/IntakeTargetRPM", intakeRPM.get());
+    Logger.recordOutput("Superstructure/Indexer/Unjam/State", autoUnjamState.name());
+    Logger.recordOutput(
+        "Superstructure/Indexer/Unjam/DetectionElapsedSecs", jamDetectionElapsedSecs);
+    Logger.recordOutput("Superstructure/Indexer/Unjam/StateElapsedSecs", autoUnjamStateElapsedSecs);
+    Logger.recordOutput("Superstructure/Indexer/Unjam/TotalElapsedSecs", autoUnjamTotalElapsedSecs);
+    Logger.recordOutput(
+        "Superstructure/Indexer/Unjam/Stalled",
+        autoUnjamState == AutoUnjamState.IDLE && isStalled());
   }
 
   /** Runs closed-loop velocity (rad/s). */
@@ -176,12 +239,14 @@ public class Indexer {
   public void runVolts(double volts) {
     closedLoop = false;
     targetVelocityRadPerSec = 0.0;
+    resetAutoUnjamState(false);
     io.runVolts(volts);
   }
 
   public void runOpenLoop(double output) {
     closedLoop = false;
     targetVelocityRadPerSec = 0.0;
+    resetAutoUnjamState(false);
     io.runOpenLoop(output);
   }
 
@@ -238,5 +303,86 @@ public class Indexer {
 
   public boolean isMotorConnected() {
     return inputs.motorConnected;
+  }
+
+  private void seedProfileFromMeasuredVelocity() {
+    setpoint = new TrapezoidProfile.State(0.0, inputs.velocityRadPerSec);
+    targetPositionRad = setpoint.position;
+    profileNeedsReset = false;
+  }
+
+  private void updateAutoUnjamState() {
+    if (!shouldEnableAutoUnjam()) {
+      resetAutoUnjamState(autoUnjamState != AutoUnjamState.IDLE);
+      return;
+    }
+
+    switch (autoUnjamState) {
+      case IDLE -> {
+        if (isStalled()) {
+          jamDetectionElapsedSecs += Constants.loopPeriodSecs;
+          if (jamDetectionElapsedSecs >= jamDetectionTimeSecs.get()) {
+            autoUnjamState = AutoUnjamState.REVERSE_PULSE;
+            jamDetectionElapsedSecs = 0.0;
+            autoUnjamStateElapsedSecs = 0.0;
+            autoUnjamTotalElapsedSecs = 0.0;
+          }
+        } else {
+          jamDetectionElapsedSecs = 0.0;
+        }
+      }
+      case REVERSE_PULSE, FORWARD_PULSE -> {
+        jamDetectionElapsedSecs = 0.0;
+        autoUnjamStateElapsedSecs += Constants.loopPeriodSecs;
+        autoUnjamTotalElapsedSecs += Constants.loopPeriodSecs;
+
+        if (autoUnjamState == AutoUnjamState.REVERSE_PULSE
+            && autoUnjamStateElapsedSecs >= unjamReverseTimeSecs.get()) {
+          autoUnjamState = AutoUnjamState.FORWARD_PULSE;
+          autoUnjamStateElapsedSecs = 0.0;
+        } else if (autoUnjamState == AutoUnjamState.FORWARD_PULSE) {
+          if (isRecoveredFromJam()) {
+            resetAutoUnjamState(true);
+          } else if (autoUnjamStateElapsedSecs >= unjamForwardTimeSecs.get()) {
+            autoUnjamState = AutoUnjamState.REVERSE_PULSE;
+            autoUnjamStateElapsedSecs = 0.0;
+          }
+        }
+      }
+    }
+  }
+
+  private boolean shouldEnableAutoUnjam() {
+    return inputs.motorConnected
+        && !staticCharacterizationActive
+        && targetVelocityRadPerSec
+            >= Units.rotationsPerMinuteToRadiansPerSecond(jamDetectionCommandVelocityRPM.get());
+  }
+
+  private boolean isStalled() {
+    return inputs.currentAmps >= jamDetectionCurrentAmps.get()
+        && Math.abs(inputs.velocityRadPerSec)
+            <= Units.rotationsPerMinuteToRadiansPerSecond(jamDetectionVelocityRPM.get());
+  }
+
+  private boolean isRecoveredFromJam() {
+    return inputs.velocityRadPerSec
+        >= Units.rotationsPerMinuteToRadiansPerSecond(jamDetectionVelocityRPM.get());
+  }
+
+  private void runAutoUnjamOutput() {
+    switch (autoUnjamState) {
+      case REVERSE_PULSE -> io.runOpenLoop(-unjamReverseCurrentAmps.get());
+      case FORWARD_PULSE -> io.runOpenLoop(unjamForwardCurrentAmps.get());
+      case IDLE -> {}
+    }
+  }
+
+  private void resetAutoUnjamState(boolean resetProfile) {
+    autoUnjamState = AutoUnjamState.IDLE;
+    jamDetectionElapsedSecs = 0.0;
+    autoUnjamStateElapsedSecs = 0.0;
+    autoUnjamTotalElapsedSecs = 0.0;
+    profileNeedsReset = profileNeedsReset || resetProfile;
   }
 }
