@@ -26,102 +26,64 @@ public class Autos {
     this.superstructure = superstructure;
   }
 
-  public Command TEST() {
-    PathPlannerPath cycle;
-    try {
-      cycle = PathPlannerPath.fromChoreoTrajectory("MTEST");
-    } catch (Exception e) {
-      System.out.println("Failed to load path: " + e.getMessage());
-      return Commands.runOnce(
-          () ->
-              RobotState.getInstance()
-                  .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL));
-    }
-    return Commands.sequence(
-        Commands.runOnce(
-            () ->
-                RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL)),
-        AutoBuilder.resetOdom(cycle.getStartingHolonomicPose().get()),
-        AutoBuilder.followPath(cycle));
+  public Command RIGHT_MID_OUTPOST() {
+    return generateSequence(true);
   }
 
-  public Command RIGHT_MID_DOUBLE() {
-    PathPlannerPath cycle;
-    try {
-      cycle = PathPlannerPath.fromChoreoTrajectory("RIGHT_MID_DOUBLE");
-    } catch (Exception e) {
-      System.out.println("Failed to load path: " + e.getMessage());
-      return Commands.none();
-    }
-
-    return Commands.sequence(
-        Commands.runOnce(
-            () ->
-                RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL)),
-        Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(true)),
-        AutoBuilder.resetOdom(cycle.getStartingHolonomicPose().get()),
-        Commands.runOnce(intake::deploy),
-        Commands.runOnce(
-            () -> superstructure.getShooter().setGoals(7.76, Units.degreesToRadians(23.6))),
-        Commands.runOnce(
-            () ->
-                superstructure
-                    .getTurret()
-                    .setTargetFieldRelativeAngle(Rotation2d.fromDegrees(-101), 0)),
-        AutoBuilder.followPath(cycle),
-        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
-        Commands.waitSeconds(5),
-        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)),
-        AutoBuilder.followPath(cycle),
-        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)));
+  public Command LEFT_MID_DEPOT() {
+    return generateSequence(false);
   }
 
-  public Command RIGHT_MID_OUTPOST_CLIMB() {
-    PathPlannerPath cycle;
+  private Command generateSequence(boolean lr) {
+    PathPlannerPath pathOne;
+    PathPlannerPath pathTwo;
     try {
-      cycle = PathPlannerPath.fromChoreoTrajectory("RIGHT_MID_OUTPOST");
+      pathOne = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_ONE" : "LEFT_ONE");
+      pathTwo = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_TWO" : "LEFT_TWO");
     } catch (Exception e) {
       System.out.println("Failed to load path: " + e.getMessage());
       return Commands.print("Auto failed");
     }
     return Commands.sequence(
-        Constants.currentMode == Constants.Mode.SIM
-            ? Commands.runOnce(() -> superstructure.setFuelSimInventoryCount(24))
-            : Commands.none(),
-        AutoBuilder.resetOdom(cycle.getStartingHolonomicPose().get()),
+        AutoBuilder.resetOdom(pathOne.getStartingHolonomicPose().get()),
         Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(true)),
         Commands.runOnce(
             () ->
                 RobotState.getInstance()
                     .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
         Commands.runOnce(intake::deploy),
-        AutoBuilder.followPath(cycle),
+        Commands.waitUntil(intake::isAtGoal),
+        AutoBuilder.followPath(pathOne),
+        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
+        Commands.waitSeconds(5),
+        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)),
+        Commands.runOnce(
+            () ->
+                RobotState.getInstance()
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+        AutoBuilder.followPath(pathTwo),
         Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
         Commands.runOnce(
             () ->
                 RobotState.getInstance()
                     .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM)),
         new DriveToPose(
-                drive,
-                () ->
-                    new Pose2d(
+            drive,
+            () ->
+                !lr
+                    ? new Pose2d(
+                        FieldConstants.Depot.depotCenter
+                            .get()
+                            .toTranslation2d()
+                            .minus(new Translation2d(Units.inchesToMeters(27.5 / 2 - 9), 0)),
+                        Rotation2d.fromDegrees(180))
+                    : new Pose2d(
                         FieldConstants.Outpost.centerPoint
                             .get()
                             .minus(new Translation2d(Units.inchesToMeters(12 + 27.5 / 2), 0)),
-                        Rotation2d.fromDegrees(180)))
-            .withTimeout(8),
-        new DriveToPose(
-            drive,
-            () ->
-                new Pose2d(
-                    FieldConstants.Tower.rightUpright
-                        .get()
-                        .minus(
-                            new Translation2d(
-                                -Units.inchesToMeters(14),
-                                Units.inchesToMeters(-5.875 - 27.5 / 2))),
-                    Rotation2d.fromDegrees(-90))));
+                        Rotation2d.fromDegrees(180))),
+        Constants.currentMode == Constants.Mode.SIM
+            ? Commands.runOnce(() -> superstructure.setFuelSimInventoryCount(24))
+            : Commands.none());
   }
 }

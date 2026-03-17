@@ -43,8 +43,18 @@ public class VisionConstants {
               new Rotation3d(0.0, Units.degreesToRadians(-25), Units.degreesToRadians(45))),
           2.0);
 
+  public static final TagCameraConfig camera2config =
+      TagCameraConfig.fixed(
+          "camera_2",
+          new Transform3d(
+              Units.inchesToMeters(11.141),
+              Units.inchesToMeters(-11.141),
+              Units.inchesToMeters(6.498),
+              new Rotation3d(0.0, Units.degreesToRadians(-25), Units.degreesToRadians(-45))),
+          2.0);
+
   public static final TagCameraConfig[] tagCameraConfigs =
-      new TagCameraConfig[] {camera0Config, camera1Config};
+      new TagCameraConfig[] {camera0Config, camera1Config, camera2config};
 
   public static Transform3d robotToDetectionCamera =
       new Transform3d(

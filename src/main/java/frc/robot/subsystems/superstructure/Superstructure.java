@@ -9,6 +9,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.RobotState;
+import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.superstructure.indexer.Indexer;
 import frc.robot.subsystems.superstructure.shooter.Shooter;
 import frc.robot.subsystems.superstructure.turret.Turret;
@@ -27,23 +28,29 @@ public class Superstructure extends SubsystemBase {
       new LoggedTunableNumber("Manual/Enabled", 0.0);
   private static final LoggedTunableNumber TRENCH_LOOKAHEAD_SECS =
       new LoggedTunableNumber("Superstructure/TrenchLookaheadSecs", 0.5);
+  private static final LoggedTunableNumber TRENCH_INTAKE_EXTRA_MARGIN_SECS =
+      new LoggedTunableNumber("Superstructure/TrenchIntakeExtraMarginSecs", 0.5);
   private static final LoggedTunableNumber TRENCH_STATIC_ZONE_METERS =
       new LoggedTunableNumber("Superstructure/TrenchStaticZoneMeters", Units.inchesToMeters(6.0));
   private static final double TRENCH_CROSSING_EPSILON = 1e-9;
+  private static final double TRENCH_INTAKE_EXTENSION_METERS = Units.inchesToMeters(12.0);
   private static final double AIM_PITCH_OFFSET_RAD = Units.degreesToRadians(0.5);
 
   @Getter private final Shooter shooter;
   @Getter private final Turret turret;
   @Getter private final Indexer indexer;
+  private final Intake intake;
   private final ShotCalculator shotCalculator;
   private boolean trenchStowActive = false;
+  private boolean trenchIntakeDeployActive = false;
   private RobotState.TurretShooterMode activeTurretShooterMode = RobotState.TurretShooterMode.SOTM;
   @Getter @Setter private int fuelSimInventoryCount = 0;
 
-  public Superstructure(Shooter shooter, Turret turret, Indexer indexer) {
+  public Superstructure(Shooter shooter, Turret turret, Indexer indexer, Intake intake) {
     this.shooter = shooter;
     this.turret = turret;
     this.indexer = indexer;
+    this.intake = intake;
     this.shotCalculator = ShotCalculator.getInstance();
   }
 
@@ -53,6 +60,9 @@ public class Superstructure extends SubsystemBase {
     activeTurretShooterMode = resolveActiveMode(robotState);
     robotState.setTurretShooterActiveMode(activeTurretShooterMode);
     configureShotCalculator(activeTurretShooterMode);
+
+    trenchIntakeDeployActive = updateTrenchIntakeDeployState();
+    intake.setTrenchAutoDeployEnabled(trenchIntakeDeployActive);
 
     if (shooter.isHoodHomed()) {
       trenchStowActive = shouldStowHoodForTrench();
@@ -88,6 +98,7 @@ public class Superstructure extends SubsystemBase {
     Logger.recordOutput("Superstructure/ActiveTurretShooterMode", activeTurretShooterMode.name());
     Logger.recordOutput("Superstructure/ManualEnabled", manualModeEnabled.get() > 0.5);
     Logger.recordOutput("Superstructure/TrenchStowActive", trenchStowActive);
+    Logger.recordOutput("Superstructure/TrenchIntakeDeployActive", trenchIntakeDeployActive);
     Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);
   }
 
@@ -119,6 +130,69 @@ public class Superstructure extends SubsystemBase {
         TRENCH_STATIC_ZONE_METERS.get());
   }
 
+  private boolean shouldDeployIntakeForTrench() {
+    if (!intake.requiresTrenchAutoDeploy()) {
+      return false;
+    }
+
+    var robotState = RobotState.getInstance();
+    boolean pivotStowed = intake.isPivotStowedForTrench();
+    if (!trenchIntakeDeployActive && !pivotStowed) {
+      Logger.recordOutput(
+          "Superstructure/TrenchIntakeRequiredLookaheadSecs",
+          getRequiredIntakeDeployLookaheadSecs());
+      Logger.recordOutput("Superstructure/TrenchIntakeEnvelopeActive", false);
+      return false;
+    }
+
+    double lookaheadSecs = getRequiredIntakeDeployLookaheadSecs();
+    boolean trenchEnvelopeActive =
+        shouldDeployRearIntakeForTrench(
+            robotState.getRobotPose().getTranslation(),
+            robotState.getRobotPose().getRotation(),
+            robotState.getRobotVelocity(),
+            lookaheadSecs,
+            Constants.RobotDimensions.length,
+            TRENCH_INTAKE_EXTENSION_METERS,
+            TRENCH_STATIC_ZONE_METERS.get());
+
+    Logger.recordOutput("Superstructure/TrenchIntakeRequiredLookaheadSecs", lookaheadSecs);
+    Logger.recordOutput("Superstructure/TrenchIntakeEnvelopeActive", trenchEnvelopeActive);
+
+    return resolveTrenchIntakeDeployState(
+        trenchIntakeDeployActive, true, pivotStowed, trenchEnvelopeActive);
+  }
+
+  private boolean updateTrenchIntakeDeployState() {
+    boolean deployActive = shouldDeployIntakeForTrench();
+
+    if (!intake.requiresTrenchAutoDeploy()) {
+      Logger.recordOutput("Superstructure/TrenchIntakeRequiredLookaheadSecs", 0.0);
+      Logger.recordOutput("Superstructure/TrenchIntakeEnvelopeActive", false);
+    }
+
+    return deployActive;
+  }
+
+  private double getRequiredIntakeDeployLookaheadSecs() {
+    return intake.getWorstCaseDeployTimeSecs()
+        + Math.max(0.0, TRENCH_INTAKE_EXTRA_MARGIN_SECS.get());
+  }
+
+  static boolean resolveTrenchIntakeDeployState(
+      boolean currentDeployActive,
+      boolean requiresAutoDeploy,
+      boolean pivotStowed,
+      boolean trenchEnvelopeActive) {
+    if (!requiresAutoDeploy) {
+      return false;
+    }
+    if (currentDeployActive) {
+      return trenchEnvelopeActive;
+    }
+    return pivotStowed && trenchEnvelopeActive;
+  }
+
   static boolean shouldStowForTrench(
       Translation2d currentTranslation,
       Translation2d projectedTranslation,
@@ -137,6 +211,68 @@ public class Superstructure extends SubsystemBase {
             currentTranslation, projectedTranslation, FieldConstants.LinesVertical.oppHubCenter);
   }
 
+  static boolean shouldDeployRearIntakeForTrench(
+      Translation2d currentTranslation,
+      Rotation2d currentHeading,
+      ChassisSpeeds robotRelativeSpeeds,
+      double lookaheadSecs,
+      double robotLengthMeters,
+      double intakeExtensionMeters,
+      double trenchSafetyZoneMeters) {
+    Translation2d projectedTranslation =
+        getProjectedTranslation(
+            currentTranslation, robotRelativeSpeeds, currentHeading, lookaheadSecs);
+    Rotation2d projectedHeading =
+        getProjectedHeading(currentHeading, robotRelativeSpeeds, lookaheadSecs);
+
+    return shouldDeployRearIntakeForTrench(
+        currentTranslation,
+        projectedTranslation,
+        currentHeading,
+        projectedHeading,
+        robotLengthMeters,
+        intakeExtensionMeters,
+        trenchSafetyZoneMeters);
+  }
+
+  static boolean shouldDeployRearIntakeForTrench(
+      Translation2d currentTranslation,
+      Translation2d projectedTranslation,
+      Rotation2d currentHeading,
+      Rotation2d projectedHeading,
+      double robotLengthMeters,
+      double intakeExtensionMeters,
+      double trenchSafetyZoneMeters) {
+    Translation2d currentIntakeTip =
+        getRearIntakeTipTranslation(
+            currentTranslation, currentHeading, robotLengthMeters, intakeExtensionMeters);
+    Translation2d projectedIntakeTip =
+        getRearIntakeTipTranslation(
+            projectedTranslation, projectedHeading, robotLengthMeters, intakeExtensionMeters);
+    double deployZoneMeters = Math.max(0.0, trenchSafetyZoneMeters);
+
+    return isWithinTrenchDeployEnvelope(
+            currentIntakeTip,
+            projectedIntakeTip,
+            FieldConstants.LinesVertical.hubCenter,
+            deployZoneMeters)
+        || isWithinTrenchDeployEnvelope(
+            currentIntakeTip,
+            projectedIntakeTip,
+            FieldConstants.LinesVertical.oppHubCenter,
+            deployZoneMeters);
+  }
+
+  private static boolean isWithinTrenchDeployEnvelope(
+      Translation2d currentIntakeTip,
+      Translation2d projectedIntakeTip,
+      double trenchX,
+      double deployZoneMeters) {
+    return isWithinTrenchStowZone(currentIntakeTip, trenchX, deployZoneMeters)
+        || isWithinTrenchStowZone(projectedIntakeTip, trenchX, deployZoneMeters)
+        || crossesTrenchPlane(currentIntakeTip, projectedIntakeTip, trenchX);
+  }
+
   private static Translation2d getProjectedTranslation(
       Translation2d currentTranslation,
       ChassisSpeeds robotRelativeSpeeds,
@@ -145,6 +281,24 @@ public class Superstructure extends SubsystemBase {
     Translation2d fieldRelativeVelocity =
         ShotVectorCompensator.robotRelativeToField(robotRelativeSpeeds, robotHeading);
     return currentTranslation.plus(fieldRelativeVelocity.times(Math.max(lookaheadSecs, 0.0)));
+  }
+
+  private static Rotation2d getProjectedHeading(
+      Rotation2d currentHeading, ChassisSpeeds robotRelativeSpeeds, double lookaheadSecs) {
+    return currentHeading.plus(
+        Rotation2d.fromRadians(
+            robotRelativeSpeeds.omegaRadiansPerSecond * Math.max(lookaheadSecs, 0.0)));
+  }
+
+  static Translation2d getRearIntakeTipTranslation(
+      Translation2d robotTranslation,
+      Rotation2d robotHeading,
+      double robotLengthMeters,
+      double intakeExtensionMeters) {
+    double rearIntakeDistanceMeters =
+        robotLengthMeters / 2.0 + Math.max(0.0, intakeExtensionMeters);
+    return robotTranslation.plus(
+        new Translation2d(rearIntakeDistanceMeters, robotHeading.plus(Rotation2d.kPi)));
   }
 
   private static boolean isWithinTrenchStowZone(

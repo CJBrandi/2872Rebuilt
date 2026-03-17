@@ -4,86 +4,29 @@
  "type":"Swerve",
  "variables":{
   "expressions":{
-   "PICKUP_VELO":{
+   "SHOOT_LINE":{
+    "dimension":"Length",
+    "var":{
+     "exp":"3.6 m",
+     "val":3.6
+    }
+   },
+   "STARTING_LINE":{
+    "dimension":"Length",
+    "var":{
+     "exp":"4.1 m",
+     "val":4.1
+    }
+   },
+   "TRENCH_VELO":{
     "dimension":"LinVel",
     "var":{
-     "exp":"1 m / s",
-     "val":1.0
+     "exp":"2 m / s",
+     "val":2.0
     }
    }
   },
-  "poses":{
-   "RIGHT_MID":{
-    "x":{
-     "exp":"7.5 m",
-     "val":7.5
-    },
-    "y":{
-     "exp":"3 m",
-     "val":3.0
-    },
-    "heading":{
-     "exp":"-90 deg",
-     "val":-1.5707963267948966
-    }
-   },
-   "RIGHT_PICKUP":{
-    "x":{
-     "exp":"7.5 m",
-     "val":7.5
-    },
-    "y":{
-     "exp":"1.25 m",
-     "val":1.25
-    },
-    "heading":{
-     "exp":"-90 deg",
-     "val":-1.5707963267948966
-    }
-   },
-   "RIGHT_START":{
-    "x":{
-     "exp":"4 m",
-     "val":4.0
-    },
-    "y":{
-     "exp":"0.65 m",
-     "val":0.65
-    },
-    "heading":{
-     "exp":"0 deg",
-     "val":0.0
-    }
-   },
-   "RIGHT_TRANS":{
-    "x":{
-     "exp":"6.6 m",
-     "val":6.6
-    },
-    "y":{
-     "exp":"1 m",
-     "val":1.0
-    },
-    "heading":{
-     "exp":"0 rad",
-     "val":0.0
-    }
-   },
-   "TRENCH_CLEAR":{
-    "x":{
-     "exp":"5.5 m",
-     "val":5.5
-    },
-    "y":{
-     "exp":"0.65 m",
-     "val":0.65
-    },
-    "heading":{
-     "exp":"0 rad",
-     "val":0.0
-    }
-   }
-  }
+  "poses":{}
  },
  "config":{
   "frontLeft":{
@@ -144,8 +87,8 @@
     "val":0.42545
    },
    "back":{
-    "exp":"16.75 in",
-    "val":0.42545
+    "exp":"25.75 in",
+    "val":0.65405
    }
   },
   "differentialTrackWidth":{
@@ -155,7 +98,7 @@
  },
  "generationFeatures":[],
  "codegen":{
-  "root":"../../java",
+  "root":"../../java/frc/robot",
   "genVars":false,
   "genTrajData":false,
   "useChoreoLib":false

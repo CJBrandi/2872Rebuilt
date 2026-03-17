@@ -53,8 +53,8 @@ public class Hood {
         kD.initDefault(40);
         kS.initDefault(5);
         kG.initDefault(5);
-        maxVelocityDegPerSec.initDefault(180);
-        maxAccelerationDegPerSec2.initDefault(360);
+        maxVelocityDegPerSec.initDefault(360);
+        maxAccelerationDegPerSec2.initDefault(720);
       }
       case SIM, REPLAY -> {
         kP.initDefault(300);

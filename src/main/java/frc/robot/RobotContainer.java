@@ -72,6 +72,7 @@ public class RobotContainer {
         camera0Config.withTurretAngleAtTimestamp(
             timestampSeconds -> RobotState.getInstance().getTurretAngleAtTime(timestampSeconds));
     TagCameraConfig runtimeCamera1Config = camera1Config;
+    TagCameraConfig runtimeCamera2Config = camera2config;
 
     switch (Constants.getCurrentMode()) {
       case REAL:
@@ -82,6 +83,15 @@ public class RobotContainer {
                 new ModuleIOTalonFX(TunerConstants.FrontRight),
                 new ModuleIOTalonFX(TunerConstants.BackLeft),
                 new ModuleIOTalonFX(TunerConstants.BackRight));
+
+        intake =
+            new Intake(
+                new PivotIOTalonFX(
+                    Constants.IntakeConstants.PivotConstants.canId,
+                    Constants.IntakeConstants.canBus),
+                new RollerIOTalonFX(
+                    Constants.IntakeConstants.RollerConstants.canId,
+                    Constants.IntakeConstants.canBus));
 
         superstructure =
             new Superstructure(
@@ -102,23 +112,16 @@ public class RobotContainer {
                 new Indexer(
                     new IndexerIOTalonFX(
                         Constants.SuperstructureConstants.IndexerConstants.canId,
-                        Constants.SuperstructureConstants.IndexerConstants.canBus)));
+                        Constants.SuperstructureConstants.IndexerConstants.canBus)),
+                intake);
 
         elevator = new Elevator(new ElevatorIO() {});
-
-        intake =
-            new Intake(
-                new PivotIOTalonFX(
-                    Constants.IntakeConstants.PivotConstants.canId,
-                    Constants.IntakeConstants.canBus),
-                new RollerIOTalonFX(
-                    Constants.IntakeConstants.RollerConstants.canId,
-                    Constants.IntakeConstants.canBus));
         tag =
             new Tag(
                 drive::addVisionMeasurement,
                 new TagIOPhotonVision(runtimeCamera0Config),
-                new TagIOPhotonVision(runtimeCamera1Config));
+                new TagIOPhotonVision(runtimeCamera1Config),
+                new TagIOPhotonVision(runtimeCamera2Config));
         /*
         detection =
             new Detection(
@@ -138,15 +141,16 @@ public class RobotContainer {
                 new ModuleIOSim(TunerConstants.BackLeft),
                 new ModuleIOSim(TunerConstants.BackRight));
 
+        intake = new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
+
         superstructure =
             new Superstructure(
                 new Shooter(new FlywheelIOSim(), new HoodIOSim()),
                 new Turret(new TurretIOSim()),
-                new Indexer(new IndexerIOSim()));
+                new Indexer(new IndexerIOSim()),
+                intake);
 
         elevator = new Elevator(new ElevatorIOSim());
-
-        intake = new Intake(new PivotIOSim(), new RollerIOSim(DCMotor.getKrakenX44(1), 1.0, 0.001));
 
         tag =
             new Tag(
@@ -166,15 +170,16 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {});
 
+        intake = new Intake(new PivotIO() {}, new RollerIO() {});
+
         superstructure =
             new Superstructure(
                 new Shooter(new FlywheelIO() {}, new HoodIO() {}),
                 new Turret(new TurretIO() {}),
-                new Indexer(new IndexerIO() {}));
+                new Indexer(new IndexerIO() {}),
+                intake);
 
         elevator = new Elevator(new ElevatorIO() {});
-
-        intake = new Intake(new PivotIO() {}, new RollerIO() {});
 
         tag = new Tag(drive::addVisionMeasurement, new TagIO() {}, new TagIO() {});
         detection = new Detection(drive::getPose, new DetectionIO() {});
@@ -257,9 +262,8 @@ public class RobotContainer {
     characterizer = new LoggedDashboardChooser<>("Characterization", new SendableChooser<>());
     auto = new LoggedDashboardChooser<>("Auto", new SendableChooser<>());
 
-    auto.addOption("Right middle cycle", autos.RIGHT_MID_DOUBLE());
-    auto.addOption("Right middle outpost", autos.RIGHT_MID_OUTPOST_CLIMB());
-    auto.addOption("Test", autos.TEST());
+    auto.addOption("Right middle outpost", autos.RIGHT_MID_OUTPOST());
+    auto.addOption("Left middle depot", autos.LEFT_MID_DEPOT());
     // Set up SysId routines
     characterizer.addOption(
         "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));

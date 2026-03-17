@@ -10,9 +10,11 @@ package frc.robot.subsystems.intake;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Getter;
+import org.littletonrobotics.junction.Logger;
 
 public class Intake extends SubsystemBase {
   // Angle constants: 0° = ground/deployed, 90° = stowed
@@ -22,6 +24,8 @@ public class Intake extends SubsystemBase {
   public static final Rotation2d groundAngle = Rotation2d.fromDegrees(-8);
 
   private boolean runningIntake = false;
+  private Supplier<Rotation2d> requestedPivotGoal = () -> groundAngle;
+  private boolean trenchAutoDeployEnabled = false;
 
   // Subsystems
   @Getter private final Pivot pivot;
@@ -30,23 +34,24 @@ public class Intake extends SubsystemBase {
   public Intake(PivotIO pivotIO, RollerIO rollerIO) {
     this.pivot = new Pivot(pivotIO);
     this.roller = new Roller(rollerIO);
+    pivot.setGoal(() -> getCommandedPivotGoal().getRadians());
   }
 
   public void setPivotGoal(Supplier<Rotation2d> goal) {
-    pivot.setGoal(goal);
+    requestedPivotGoal = goal;
   }
 
   public void setPivotGoal(DoubleSupplier goalRad) {
-    pivot.setGoal(goalRad);
+    requestedPivotGoal = () -> Rotation2d.fromRadians(goalRad.getAsDouble());
   }
 
   public void stow() {
-    pivot.setGoal(() -> stowedAngle);
+    requestedPivotGoal = () -> stowedAngle;
     roller.stop();
   }
 
   public void deploy() {
-    pivot.setGoal(() -> groundAngle);
+    requestedPivotGoal = () -> groundAngle;
     roller.runIntake();
   }
 
@@ -66,6 +71,34 @@ public class Intake extends SubsystemBase {
 
   public Rotation2d getPivotAngle() {
     return pivot.getAngle();
+  }
+
+  public Rotation2d getRequestedPivotGoal() {
+    return requestedPivotGoal.get();
+  }
+
+  public Rotation2d getCommandedPivotGoal() {
+    return trenchAutoDeployEnabled ? groundAngle : getRequestedPivotGoal();
+  }
+
+  public boolean requiresTrenchAutoDeploy() {
+    return getRequestedPivotGoal().getDegrees() > Constants.IntakeBounds.maxDeployAngleDeg;
+  }
+
+  public boolean isPivotStowedForTrench() {
+    return getPivotAngle().getDegrees() > Constants.IntakeBounds.maxDeployAngleDeg;
+  }
+
+  public double getWorstCaseDeployTimeSecs() {
+    return pivot.getWorstCaseDeployTimeSecs();
+  }
+
+  public void setTrenchAutoDeployEnabled(boolean enabled) {
+    trenchAutoDeployEnabled = enabled;
+  }
+
+  public boolean isTrenchAutoDeployEnabled() {
+    return trenchAutoDeployEnabled;
   }
 
   /** Returns the homing sequence command for the pivot */
@@ -95,5 +128,12 @@ public class Intake extends SubsystemBase {
 
   public void setPositionPivot(double degrees) {
     pivot.setPosition(degrees);
+  }
+
+  @Override
+  public void periodic() {
+    Logger.recordOutput("Intake/RequestedPivotGoalDeg", getRequestedPivotGoal().getDegrees());
+    Logger.recordOutput("Intake/CommandedPivotGoalDeg", getCommandedPivotGoal().getDegrees());
+    Logger.recordOutput("Intake/TrenchAutoDeployEnabled", trenchAutoDeployEnabled);
   }
 }

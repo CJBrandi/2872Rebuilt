@@ -72,7 +72,7 @@ public class Turret {
   @Getter private Rotation2d targetTurretAngle = null; // Calculated turret-relative angle
   @Getter private double targetVelocityRadPerSec = 0.0; // Feedforward velocity from ShotCalculator
 
-  // Tracks last commanded goal to pick shortest legal path
+  // Tracks the last commanded goal for logging/debugging.
   private double lastGoalAngle = 0.0;
 
   @AutoLogOutput(key = "Turret/StaticCharacterizationActive")
@@ -157,9 +157,9 @@ public class Turret {
           Rotation2d.fromRadians(targetFieldRelativeAngle.getRadians() - robotAngleRad);
       double robotRelativeGoalVelocity = targetVelocityRadPerSec - robotAngularVelocity;
 
-      // Select the closest legal equivalent without crossing the asymmetric hard-stop window.
       double bestAngle =
-          selectAngleWithinLimits(robotRelativeGoalAngle.getRadians()).selectedRadians();
+          selectFieldRelativeAngleWithinLimits(robotRelativeGoalAngle.getRadians())
+              .selectedRadians();
       lastGoalAngle = bestAngle;
       targetTurretAngle = Rotation2d.fromRadians(bestAngle);
 
@@ -180,7 +180,8 @@ public class Turret {
       Logger.recordOutput("Turret/GoalVelocityRadPerSec", robotRelativeGoalVelocity);
     } else if (closedLoop && !staticCharacterizationActive && targetTurretAngle != null) {
       // Direct turret angle control (no field-relative conversion)
-      double bestAngle = selectAngleWithinLimits(targetTurretAngle.getRadians()).selectedRadians();
+      double bestAngle =
+          selectAbsoluteAngleWithinLimits(targetTurretAngle.getRadians()).selectedRadians();
       lastGoalAngle = bestAngle;
       targetTurretAngle = Rotation2d.fromRadians(bestAngle);
 
@@ -204,16 +205,24 @@ public class Turret {
     TurretVisualizer.update(inputs.motorEncoderPosition.getRadians());
   }
 
-  private TurretLimits.Selection selectAngleWithinLimits(double robotRelativeGoalRad) {
-    var selection = TurretLimits.selectAngleRadians(robotRelativeGoalRad, lastGoalAngle);
-
-    Logger.recordOutput("Turret/Safety/RequestedAngleDeg", selection.requestedDeg());
-    Logger.recordOutput("Turret/Safety/PrincipalAngleDeg", selection.principalDeg());
-    Logger.recordOutput("Turret/Safety/ReferenceAngleDeg", selection.referenceDeg());
-    Logger.recordOutput("Turret/Safety/SelectedAngleDeg", selection.selectedDeg());
-    Logger.recordOutput("Turret/Safety/FallbackClampUsed", selection.usedLimitFallback());
-
+  private TurretLimits.Selection selectAbsoluteAngleWithinLimits(double requestedAngleRad) {
+    var selection = TurretLimits.selectAbsoluteAngleRadians(requestedAngleRad);
+    logAngleSelection("absolute", selection);
     return selection;
+  }
+
+  private TurretLimits.Selection selectFieldRelativeAngleWithinLimits(double requestedAngleRad) {
+    var selection = TurretLimits.selectFieldRelativeAngleRadians(requestedAngleRad);
+    logAngleSelection("field_relative", selection);
+    return selection;
+  }
+
+  private void logAngleSelection(String mode, TurretLimits.Selection selection) {
+    Logger.recordOutput("Turret/Safety/SelectionMode", mode);
+    Logger.recordOutput("Turret/Safety/RequestedAngleDeg", selection.requestedDeg());
+    Logger.recordOutput("Turret/Safety/CandidateAngleDeg", selection.candidateDeg());
+    Logger.recordOutput("Turret/Safety/SelectedAngleDeg", selection.selectedDeg());
+    Logger.recordOutput("Turret/Safety/SelectionClamped", selection.clamped());
   }
 
   private TrapezoidProfile.State clampSetpointToLimits(TrapezoidProfile.State state) {

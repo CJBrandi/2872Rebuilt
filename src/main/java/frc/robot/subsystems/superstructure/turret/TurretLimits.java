@@ -5,6 +5,9 @@ import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
 
 final class TurretLimits {
+  private static final double FULL_ROTATION_DEG = 360.0;
+  private static final double EPSILON = 1e-9;
+
   static final double MIN_ANGLE_DEG = Constants.SuperstructureConstants.TurretConstants.minAngleDeg;
   static final double MAX_ANGLE_DEG = Constants.SuperstructureConstants.TurretConstants.maxAngleDeg;
   static final double MIN_ANGLE_RAD = Units.degreesToRadians(MIN_ANGLE_DEG);
@@ -12,38 +15,28 @@ final class TurretLimits {
 
   private TurretLimits() {}
 
-  static Selection selectAngleRadians(double requestedAngleRad, double referenceAngleRad) {
+  static Selection selectAbsoluteAngleRadians(double requestedAngleRad) {
     double requestedDeg = Units.radiansToDegrees(requestedAngleRad);
-    double principalDeg = MathUtil.inputModulus(requestedDeg, -180.0, 180.0);
-    double referenceDeg = clampDegrees(Units.radiansToDegrees(referenceAngleRad));
+    double selectedDeg = clampDegrees(requestedDeg);
 
-    double selectedDeg = Double.NaN;
-    double bestDistance = Double.POSITIVE_INFINITY;
-
-    int minWrap = (int) Math.ceil((MIN_ANGLE_DEG - principalDeg) / 360.0);
-    int maxWrap = (int) Math.floor((MAX_ANGLE_DEG - principalDeg) / 360.0);
-    for (int wrap = minWrap; wrap <= maxWrap; wrap++) {
-      double candidateDeg = principalDeg + 360.0 * wrap;
-
-      double distance = Math.abs(candidateDeg - referenceDeg);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        selectedDeg = candidateDeg;
-      }
-    }
-
-    boolean usedLimitFallback = false;
-    if (Double.isNaN(selectedDeg)) {
-      selectedDeg = nearestLimitDegrees(principalDeg, referenceDeg);
-      usedLimitFallback = true;
-    }
-
-    return new Selection(requestedDeg, principalDeg, referenceDeg, selectedDeg, usedLimitFallback);
+    return new Selection(
+        requestedDeg, requestedDeg, selectedDeg, Math.abs(selectedDeg - requestedDeg) > EPSILON);
   }
 
-  static double findBestAngleWithinLimitsRadians(
-      double requestedAngleRad, double referenceAngleRad) {
-    return selectAngleRadians(requestedAngleRad, referenceAngleRad).selectedRadians();
+  static Selection selectFieldRelativeAngleRadians(double requestedAngleRad) {
+    double requestedDeg = Units.radiansToDegrees(requestedAngleRad);
+    double candidateDeg = MathUtil.inputModulus(requestedDeg, -180.0, 180.0);
+
+    while (candidateDeg > MAX_ANGLE_DEG + EPSILON) {
+      candidateDeg -= FULL_ROTATION_DEG;
+    }
+    while (candidateDeg < MIN_ANGLE_DEG - EPSILON) {
+      candidateDeg += FULL_ROTATION_DEG;
+    }
+
+    double selectedDeg = clampDegrees(candidateDeg);
+    return new Selection(
+        requestedDeg, candidateDeg, selectedDeg, Math.abs(selectedDeg - candidateDeg) > EPSILON);
   }
 
   static double clampDegrees(double angleDeg) {
@@ -59,29 +52,7 @@ final class TurretLimits {
         || (angleRad <= MIN_ANGLE_RAD && velocityRadPerSec < 0.0);
   }
 
-  private static double nearestLimitDegrees(double principalDeg, double referenceDeg) {
-    double minDistance = angularDistanceDegrees(principalDeg, MIN_ANGLE_DEG);
-    double maxDistance = angularDistanceDegrees(principalDeg, MAX_ANGLE_DEG);
-
-    if (Math.abs(minDistance - maxDistance) < 1e-9) {
-      double minReferenceDistance = Math.abs(MIN_ANGLE_DEG - referenceDeg);
-      double maxReferenceDistance = Math.abs(MAX_ANGLE_DEG - referenceDeg);
-      return minReferenceDistance <= maxReferenceDistance ? MIN_ANGLE_DEG : MAX_ANGLE_DEG;
-    }
-
-    return minDistance < maxDistance ? MIN_ANGLE_DEG : MAX_ANGLE_DEG;
-  }
-
-  private static double angularDistanceDegrees(double firstDeg, double secondDeg) {
-    return Math.abs(MathUtil.inputModulus(firstDeg - secondDeg, -180.0, 180.0));
-  }
-
-  record Selection(
-      double requestedDeg,
-      double principalDeg,
-      double referenceDeg,
-      double selectedDeg,
-      boolean usedLimitFallback) {
+  record Selection(double requestedDeg, double candidateDeg, double selectedDeg, boolean clamped) {
     double selectedRadians() {
       return Units.degreesToRadians(selectedDeg);
     }

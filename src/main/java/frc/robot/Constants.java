@@ -8,6 +8,7 @@
 package frc.robot;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.RobotBase;
 import lombok.Getter;
 
@@ -30,6 +31,18 @@ public final class Constants {
     public static final double width = frameWidth + 2 * bumperThickness; // Total with bumpers
     public static final double length = frameLength + 2 * bumperThickness; // Total with bumpers
     public static final double bumperHeight = 0.2; // Height of bumpers
+  }
+
+  /** Physical footprint used for keeping the robot off the field walls. */
+  public static class FieldWallProtection {
+    public static final double bumperThicknessMeters = Units.inchesToMeters(2.875);
+    public static final double intakeExtensionMeters = Units.inchesToMeters(12.0);
+    public static final double frontExtentMeters =
+        RobotDimensions.frameLength / 2.0 + bumperThicknessMeters;
+    public static final double rearExtentMeters =
+        RobotDimensions.frameLength / 2.0 + intakeExtensionMeters;
+    public static final double sideExtentMeters =
+        RobotDimensions.frameWidth / 2.0 + bumperThicknessMeters;
   }
 
   // Intake bounding box for FuelSim (robot-relative, meters)
@@ -98,8 +111,8 @@ public final class Constants {
       public static final int canId = 60;
       public static final String canBus = "";
       public static final double reduction = 40.66;
-      public static final double minAngleDeg = -385.0;
-      public static final double maxAngleDeg = 25.0;
+      public static final double minAngleDeg = -540.0;
+      public static final double maxAngleDeg = -180.0;
     }
 
     public static class ShooterConstants {

@@ -32,14 +32,18 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Pivot extends SubsystemBase {
+  private static final double PROFILE_TIME_ESTIMATE_TIMEOUT_SECS = 5.0;
+  private static final double PROFILE_TIME_POSITION_TOLERANCE_RAD = Units.degreesToRadians(0.25);
+  private static final double PROFILE_TIME_VELOCITY_TOLERANCE_RAD_PER_SEC =
+      Units.degreesToRadians(1.0);
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Intake/Pivot/kP");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Intake/Pivot/kD");
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Intake/Pivot/kS");
   private static final LoggedTunableNumber kG = new LoggedTunableNumber("Intake/Pivot/kG");
   private static final LoggedTunableNumber maxVelocityDegPerSec =
-      new LoggedTunableNumber("Intake/Pivot/MaxVelocityDegreesPerSec", 120);
+      new LoggedTunableNumber("Intake/Pivot/MaxVelocityDegreesPerSec", 360);
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Intake/Pivot/MaxAccelerationDegreesPerSec2", 360);
+      new LoggedTunableNumber("Intake/Pivot/MaxAccelerationDegreesPerSec2", 720);
   private static final LoggedTunableNumber staticVelocityThresh =
       new LoggedTunableNumber("Intake/Pivot/staticVelocityThresh", 0.1);
   private static final LoggedTunableNumber tolerance =
@@ -110,11 +114,7 @@ public class Pivot extends SubsystemBase {
   public Pivot(PivotIO io) {
     this.io = io;
 
-    profile =
-        new TrapezoidProfile(
-            new TrapezoidProfile.Constraints(
-                Units.degreesToRadians(maxVelocityDegPerSec.get()),
-                Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
+    profile = new TrapezoidProfile(getCurrentConstraints());
 
     if (Constants.getCurrentMode() != Mode.REAL) {
       homed = true;
@@ -136,11 +136,7 @@ public class Pivot extends SubsystemBase {
     }
     if (maxVelocityDegPerSec.hasChanged(hashCode())
         || maxAccelerationDegPerSec2.hasChanged(hashCode())) {
-      profile =
-          new TrapezoidProfile(
-              new TrapezoidProfile.Constraints(
-                  Units.degreesToRadians(maxVelocityDegPerSec.get()),
-                  Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
+      profile = new TrapezoidProfile(getCurrentConstraints());
     }
 
     // Set coast mode
@@ -266,6 +262,38 @@ public class Pivot extends SubsystemBase {
     return inputs.velocityRadPerSec;
   }
 
+  public double getWorstCaseDeployTimeSecs() {
+    return estimateTimeToGoal(Intake.stowedAngle, 0.0, Intake.groundAngle);
+  }
+
+  public double estimateTimeToGoal(
+      Rotation2d startAngle, double startVelocityRadPerSec, Rotation2d goalAngle) {
+    var motionProfile = new TrapezoidProfile(getCurrentConstraints());
+    State currentState =
+        new State(
+            MathUtil.clamp(
+                startAngle.getRadians(),
+                Intake.minAngle.getRadians(),
+                Intake.maxAngle.getRadians()),
+            startVelocityRadPerSec);
+    State goalState =
+        new State(
+            MathUtil.clamp(
+                goalAngle.getRadians(), Intake.minAngle.getRadians(), Intake.maxAngle.getRadians()),
+            0.0);
+    double elapsedSecs = 0.0;
+
+    while (elapsedSecs < PROFILE_TIME_ESTIMATE_TIMEOUT_SECS) {
+      if (isStateAtGoal(currentState, goalState)) {
+        return elapsedSecs;
+      }
+      currentState = motionProfile.calculate(Constants.loopPeriodSecs, currentState, goalState);
+      elapsedSecs += Constants.loopPeriodSecs;
+    }
+
+    return PROFILE_TIME_ESTIMATE_TIMEOUT_SECS;
+  }
+
   public Command homingSequence() {
     return Commands.startRun(
             () -> {
@@ -329,5 +357,18 @@ public class Pivot extends SubsystemBase {
 
   private static class StaticCharacterizationState {
     public double characterizationOutput = 0.0;
+  }
+
+  private static TrapezoidProfile.Constraints getCurrentConstraints() {
+    return new TrapezoidProfile.Constraints(
+        Units.degreesToRadians(maxVelocityDegPerSec.get()),
+        Units.degreesToRadians(maxAccelerationDegPerSec2.get()));
+  }
+
+  private static boolean isStateAtGoal(State currentState, State goalState) {
+    return Math.abs(currentState.position - goalState.position)
+            <= PROFILE_TIME_POSITION_TOLERANCE_RAD
+        && Math.abs(currentState.velocity - goalState.velocity)
+            <= PROFILE_TIME_VELOCITY_TOLERANCE_RAD_PER_SEC;
   }
 }
