@@ -127,7 +127,7 @@ public class Tag extends SubsystemBase {
                           .toPose2d()
                           .getTranslation()
                           .getDistance(RobotState.getInstance().getRobotPose().getTranslation())
-                      > 0.5;
+                      > 1;
         } else {
           rejectPose =
               observation.tagCount() == 0 // Must have at least one tag

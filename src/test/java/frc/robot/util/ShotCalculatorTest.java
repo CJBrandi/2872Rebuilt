@@ -3,6 +3,7 @@ package frc.robot.util;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,33 @@ class ShotCalculatorTest {
         () ->
             assertTranslationEquals(
                 expectedRedRight, ShotCalculator.selectAllianceLobTarget(false, true)));
+  }
+
+  @Test
+  void applyLobScalingHalvesPitchAndExitVelocity() {
+    ShotCalculator.ShootingParameters rawParameters =
+        new ShotCalculator.ShootingParameters(Rotation2d.fromDegrees(15.0), 1.2, 0.8, 0.4, 18.0);
+
+    ShotCalculator.ShootingParameters scaledParameters =
+        ShotCalculator.applyLobScaling(rawParameters);
+
+    assertAll(
+        () ->
+            assertEquals(
+                rawParameters.turretAngle().getRadians(),
+                scaledParameters.turretAngle().getRadians(),
+                EPSILON),
+        () ->
+            assertEquals(
+                rawParameters.turretVelocity(), scaledParameters.turretVelocity(), EPSILON),
+        () ->
+            assertEquals(rawParameters.pitchAngle() * 0.5, scaledParameters.pitchAngle(), EPSILON),
+        () ->
+            assertEquals(
+                rawParameters.pitchVelocity() * 0.5, scaledParameters.pitchVelocity(), EPSILON),
+        () ->
+            assertEquals(
+                rawParameters.exitVelocity() * 0.5, scaledParameters.exitVelocity(), EPSILON));
   }
 
   private static Translation2d midpoint(Translation2d first, Translation2d second) {

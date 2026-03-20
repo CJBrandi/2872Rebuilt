@@ -26,20 +26,30 @@ public class Autos {
     this.superstructure = superstructure;
   }
 
+  public Command RIGHT_MID_DOUBLE() {
+    return generateSequenceDouble(true)
+        .andThen(Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(false)));
+  }
+
   public Command RIGHT_MID_OUTPOST() {
-    return generateSequence(true);
+    return generateSequenceSingle(true)
+        .andThen(Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(false)));
+  }
+
+  public Command LEFT_MID_DOUBLE() {
+    return generateSequenceDouble(false)
+        .andThen(Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(false)));
   }
 
   public Command LEFT_MID_DEPOT() {
-    return generateSequence(false);
+    return generateSequenceSingle(false)
+        .andThen(Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(false)));
   }
 
-  private Command generateSequence(boolean lr) {
+  private Command generateSequenceSingle(boolean lr) {
     PathPlannerPath pathOne;
-    PathPlannerPath pathTwo;
     try {
-      pathOne = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_ONE" : "LEFT_ONE");
-      pathTwo = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_TWO" : "LEFT_TWO");
+      pathOne = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_OUTPOST" : "LEFT_DEPOT");
     } catch (Exception e) {
       System.out.println("Failed to load path: " + e.getMessage());
       return Commands.print("Auto failed");
@@ -54,14 +64,6 @@ public class Autos {
         Commands.runOnce(intake::deploy),
         Commands.waitUntil(intake::isAtGoal),
         AutoBuilder.followPath(pathOne),
-        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
-        Commands.waitSeconds(5),
-        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)),
-        Commands.runOnce(
-            () ->
-                RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
-        AutoBuilder.followPath(pathTwo),
         Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
         Commands.runOnce(
             () ->
@@ -85,5 +87,40 @@ public class Autos {
         Constants.currentMode == Constants.Mode.SIM
             ? Commands.runOnce(() -> superstructure.setFuelSimInventoryCount(24))
             : Commands.none());
+  }
+
+  private Command generateSequenceDouble(boolean lr) {
+    PathPlannerPath pathOne;
+    PathPlannerPath pathTwo;
+    try {
+      pathOne = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_ONE" : "LEFT_ONE");
+      pathTwo = PathPlannerPath.fromChoreoTrajectory(lr ? "RIGHT_TWO" : "LEFT_TWO");
+    } catch (Exception e) {
+      System.out.println("Failed to load path: " + e.getMessage());
+      return Commands.print("Auto failed");
+    }
+    return Commands.sequence(
+        AutoBuilder.resetOdom(pathOne.getStartingHolonomicPose().get()),
+        Commands.runOnce(() -> RobotState.getInstance().setStrictPoseEstimation(true)),
+        Commands.runOnce(
+            () ->
+                RobotState.getInstance()
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+        Commands.runOnce(intake::deploy),
+        Commands.waitUntil(intake::isAtGoal),
+        AutoBuilder.followPath(pathOne),
+        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
+        Commands.waitSeconds(3),
+        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)),
+        Commands.runOnce(
+            () ->
+                RobotState.getInstance()
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+        AutoBuilder.followPath(pathTwo),
+        Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
+        Commands.runOnce(
+            () ->
+                RobotState.getInstance()
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM)));
   }
 }

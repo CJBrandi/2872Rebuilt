@@ -262,7 +262,9 @@ public class RobotContainer {
     characterizer = new LoggedDashboardChooser<>("Characterization", new SendableChooser<>());
     auto = new LoggedDashboardChooser<>("Auto", new SendableChooser<>());
 
+    auto.addOption("Right middle double", autos.RIGHT_MID_DOUBLE());
     auto.addOption("Right middle outpost", autos.RIGHT_MID_OUTPOST());
+    auto.addOption("Left middle double", autos.LEFT_MID_DOUBLE());
     auto.addOption("Left middle depot", autos.LEFT_MID_DEPOT());
     // Set up SysId routines
     characterizer.addOption(
@@ -295,15 +297,6 @@ public class RobotContainer {
         "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
     characterizer.addOption(
         "Indexer Static Characterization", superstructure.getIndexer().staticCharacterization(2.0));
-
-    // Hood characterization/homing routines
-    characterizer.addOption("Hood Homing", superstructure.getShooter().hoodHomingCommand());
-    characterizer.addOption(
-        "Hood Static Characterization",
-        superstructure.getShooter().hoodStaticCharacterizationCommand(-2));
-
-    characterizer.addOption(
-        "Turret Static Characterization", superstructure.getTurret().staticCharacterization(2.0));
 
     // Intake characterization
     characterizer.addOption(
@@ -341,6 +334,8 @@ public class RobotContainer {
     controller.povUp().onTrue(Commands.runOnce(intake::stow, intake));
     controller.povDown().onTrue(Commands.runOnce(intake::deploy, intake));
     controller.leftBumper().onTrue(Commands.runOnce(intake::toggleIntake, intake));
+    controller.y().onTrue(Commands.runOnce(() -> intake.getRoller().runEject()));
+    controller.y().onFalse(Commands.runOnce(() -> intake.getRoller().runEject()));
 
     controller
         .rightBumper()

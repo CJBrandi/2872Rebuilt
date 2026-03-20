@@ -4,11 +4,18 @@
  "type":"Swerve",
  "variables":{
   "expressions":{
+   "GLOBAL_LIMIT":{
+    "dimension":"LinVel",
+    "var":{
+     "exp":"1.5 m / s",
+     "val":1.5
+    }
+   },
    "SHOOT_LINE":{
     "dimension":"Length",
     "var":{
-     "exp":"3.6 m",
-     "val":3.6
+     "exp":"3.75 m",
+     "val":3.75
     }
    },
    "STARTING_LINE":{
@@ -50,20 +57,20 @@
    }
   },
   "mass":{
-   "exp":"137.37 lbs",
-   "val":62.309983866900005
+   "exp":"137 lbs",
+   "val":62.142154690000005
   },
   "inertia":{
-   "exp":"6.294387476 kg m ^ 2",
-   "val":6.294387476
+   "exp":"5.683 kg m ^ 2",
+   "val":5.683
   },
   "gearing":{
    "exp":"5.357142857142857",
    "val":5.357142857142857
   },
   "radius":{
-   "exp":"2 in",
-   "val":0.0508
+   "exp":"1.859 in",
+   "val":0.0472186
   },
   "vmax":{
    "exp":"5075.4 RPM",
@@ -79,12 +86,12 @@
   },
   "bumper":{
    "front":{
-    "exp":"16.75 in",
-    "val":0.42545
+    "exp":"17 in",
+    "val":0.4318
    },
    "side":{
-    "exp":"16.75 in",
-    "val":0.42545
+    "exp":"17 in",
+    "val":0.4318
    },
    "back":{
     "exp":"25.75 in",

@@ -43,7 +43,6 @@ import frc.robot.Constants;
 import frc.robot.Constants.Mode;
 import frc.robot.RobotState;
 import frc.robot.generated.TunerConstants;
-import frc.robot.util.FieldWallConstraint;
 import frc.robot.util.LocalADStarAK;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -222,17 +221,12 @@ public class Drive extends SubsystemBase {
   public void runVelocity(ChassisSpeeds speeds) {
     // Calculate module setpoints
     ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, Constants.loopPeriodSecs);
-    ChassisSpeeds constrainedSpeeds = FieldWallConstraint.constrain(getPose(), discreteSpeeds);
-    SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(constrainedSpeeds);
+    SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, TunerConstants.kSpeedAt12Volts);
 
     // Log unoptimized setpoints and setpoint speeds
     Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    Logger.recordOutput("Drive/WallConstraint/RequestedSpeeds", discreteSpeeds);
-    Logger.recordOutput("Drive/WallConstraint/AppliedSpeeds", constrainedSpeeds);
-    Logger.recordOutput(
-        "Drive/WallConstraint/Active", chassisSpeedsDiffer(discreteSpeeds, constrainedSpeeds));
-    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", constrainedSpeeds);
+    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", discreteSpeeds);
 
     // Send setpoints to modules
     for (int i = 0; i < 4; i++) {
@@ -366,12 +360,5 @@ public class Drive extends SubsystemBase {
       new Translation2d(TunerConstants.BackLeft.LocationX, TunerConstants.BackLeft.LocationY),
       new Translation2d(TunerConstants.BackRight.LocationX, TunerConstants.BackRight.LocationY)
     };
-  }
-
-  private static boolean chassisSpeedsDiffer(ChassisSpeeds a, ChassisSpeeds b) {
-    final double epsilon = 1e-6;
-    return Math.abs(a.vxMetersPerSecond - b.vxMetersPerSecond) > epsilon
-        || Math.abs(a.vyMetersPerSecond - b.vyMetersPerSecond) > epsilon
-        || Math.abs(a.omegaRadiansPerSecond - b.omegaRadiansPerSecond) > epsilon;
   }
 }

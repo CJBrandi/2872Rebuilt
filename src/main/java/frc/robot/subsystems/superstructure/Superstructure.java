@@ -381,14 +381,15 @@ public class Superstructure extends SubsystemBase {
       return;
     }
 
-    // Use raw lookup table values for simulation to verify the trajectory solver
-    // This bypasses efficiency factor and hood angle convention issues
+    // Use shot calculator outputs directly for simulation. This still bypasses
+    // efficiency factor and hood angle convention issues while reflecting any
+    // lob-specific command scaling.
     var params = shotCalculator.getParameters();
 
     FuelSim.getInstance()
         .launchFuel(
-            MetersPerSecond.of(params.exitVelocity()), // Raw lookup table velocity (no efficiency)
-            Radians.of(params.pitchAngle()), // Raw lookup table pitch (from horizontal)
+            MetersPerSecond.of(params.exitVelocity()), // Commanded exit velocity (no efficiency)
+            Radians.of(params.pitchAngle()), // Commanded pitch from horizontal
             Radians.of(turret.getFieldRelativeAngle().getRadians()),
             Meters.of(Constants.launchHeight));
     fuelSimInventoryCount--;

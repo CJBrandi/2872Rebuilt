@@ -12,56 +12,64 @@ class TurretLimitsTest {
   private static final double EPSILON = 1e-9;
 
   @Test
-  void absoluteAngleSelectionClampsWithoutWrapping() {
+  void limitsAreSortedBeforeUse() {
+    assertAll(
+        () -> assertTrue(TurretLimits.MIN_ANGLE_DEG < TurretLimits.MAX_ANGLE_DEG),
+        () -> assertTrue(TurretLimits.MIN_ANGLE_RAD < TurretLimits.MAX_ANGLE_RAD));
+  }
+
+  @Test
+  void absoluteAngleSelectionTakesDirectPathWithinLimits() {
     TurretLimits.Selection insideRange =
-        TurretLimits.selectAbsoluteAngleRadians(Rotation2d.fromDegrees(-300.0).getRadians());
-    TurretLimits.Selection upperClamp =
-        TurretLimits.selectAbsoluteAngleRadians(Rotation2d.fromDegrees(-100.0).getRadians());
-    TurretLimits.Selection lowerClamp =
-        TurretLimits.selectAbsoluteAngleRadians(Rotation2d.fromDegrees(-600.0).getRadians());
-    TurretLimits.Selection lowerBoundary =
-        TurretLimits.selectAbsoluteAngleRadians(Rotation2d.fromDegrees(-540.0).getRadians());
+        TurretLimits.selectAbsoluteAngleRadians(
+            Rotation2d.fromDegrees(-150.0).getRadians(),
+            Rotation2d.fromDegrees(-180.0).getRadians());
 
     assertAll(
-        () -> assertEquals(-300.0, insideRange.selectedDeg(), EPSILON),
-        () -> assertEquals(-180.0, upperClamp.selectedDeg(), EPSILON),
-        () -> assertEquals(-540.0, lowerClamp.selectedDeg(), EPSILON),
-        () -> assertEquals(-540.0, lowerBoundary.selectedDeg(), EPSILON),
-        () -> assertTrue(upperClamp.clamped()),
-        () -> assertTrue(lowerClamp.clamped()),
+        () -> assertEquals(-150.0, insideRange.selectedDeg(), EPSILON),
+        () -> assertEquals(-150.0, insideRange.candidateDeg(), EPSILON),
         () -> assertFalse(insideRange.clamped()),
-        () -> assertFalse(lowerBoundary.clamped()));
+        () -> assertEquals(-180.0, insideRange.referenceDeg(), EPSILON));
   }
 
   @Test
-  void fieldRelativeSelectionMapsIntoNegativeOnlyRevolution() {
-    TurretLimits.Selection zeroDegrees =
-        TurretLimits.selectFieldRelativeAngleRadians(Rotation2d.fromDegrees(0.0).getRadians());
-    TurretLimits.Selection plusTwentyFive =
-        TurretLimits.selectFieldRelativeAngleRadians(Rotation2d.fromDegrees(25.0).getRadians());
-    TurretLimits.Selection minusOneHundred =
-        TurretLimits.selectFieldRelativeAngleRadians(Rotation2d.fromDegrees(-100.0).getRadians());
-    TurretLimits.Selection minusFourHundredFifty =
-        TurretLimits.selectFieldRelativeAngleRadians(Rotation2d.fromDegrees(-450.0).getRadians());
+  void fieldRelativeSelectionUnwrapsToClosestLegalEquivalent() {
+    TurretLimits.Selection wrappedTarget =
+        TurretLimits.selectFieldRelativeAngleRadians(
+            Rotation2d.fromDegrees(210.0).getRadians(),
+            Rotation2d.fromDegrees(-180.0).getRadians());
 
     assertAll(
-        () -> assertEquals(-360.0, zeroDegrees.selectedDeg(), EPSILON),
-        () -> assertEquals(-335.0, plusTwentyFive.selectedDeg(), EPSILON),
-        () -> assertEquals(-460.0, minusOneHundred.selectedDeg(), EPSILON),
-        () -> assertEquals(-450.0, minusFourHundredFifty.selectedDeg(), EPSILON),
-        () -> assertFalse(zeroDegrees.clamped()),
-        () -> assertFalse(plusTwentyFive.clamped()),
-        () -> assertFalse(minusOneHundred.clamped()),
-        () -> assertFalse(minusFourHundredFifty.clamped()));
+        () -> assertEquals(-150.0, wrappedTarget.selectedDeg(), EPSILON),
+        () -> assertEquals(-150.0, wrappedTarget.candidateDeg(), EPSILON),
+        () -> assertFalse(wrappedTarget.clamped()));
   }
 
   @Test
-  void fieldRelativeBackAngleUsesUpperHardStop() {
-    TurretLimits.Selection backAngle =
-        TurretLimits.selectFieldRelativeAngleRadians(Rotation2d.fromDegrees(180.0).getRadians());
+  void selectionPrefersTheEquivalentClosestToTheCurrentTurretAngle() {
+    TurretLimits.Selection nearNegativeWrap =
+        TurretLimits.selectFieldRelativeAngleRadians(
+            Rotation2d.fromDegrees(10.0).getRadians(), Rotation2d.fromDegrees(-340.0).getRadians());
+    TurretLimits.Selection nearPositiveWrap =
+        TurretLimits.selectFieldRelativeAngleRadians(
+            Rotation2d.fromDegrees(10.0).getRadians(), Rotation2d.fromDegrees(0.0).getRadians());
 
     assertAll(
-        () -> assertEquals(-180.0, backAngle.selectedDeg(), EPSILON),
-        () -> assertFalse(backAngle.clamped()));
+        () -> assertEquals(-350.0, nearNegativeWrap.selectedDeg(), EPSILON),
+        () -> assertEquals(10.0, nearPositiveWrap.selectedDeg(), EPSILON),
+        () -> assertFalse(nearNegativeWrap.clamped()),
+        () -> assertFalse(nearPositiveWrap.clamped()));
+  }
+
+  @Test
+  void clampAndVelocityChecksHonorTheConfiguredWindow() {
+    assertAll(
+        () ->
+            assertEquals(TurretLimits.MIN_ANGLE_DEG, TurretLimits.clampDegrees(-1_000.0), EPSILON),
+        () -> assertEquals(TurretLimits.MAX_ANGLE_DEG, TurretLimits.clampDegrees(1_000.0), EPSILON),
+        () -> assertTrue(TurretLimits.commandWouldPushPastLimit(TurretLimits.MAX_ANGLE_RAD, 0.1)),
+        () -> assertTrue(TurretLimits.commandWouldPushPastLimit(TurretLimits.MIN_ANGLE_RAD, -0.1)),
+        () -> assertFalse(TurretLimits.commandWouldPushPastLimit(TurretLimits.MAX_ANGLE_RAD, -0.1)),
+        () -> assertFalse(TurretLimits.commandWouldPushPastLimit(TurretLimits.MIN_ANGLE_RAD, 0.1)));
   }
 }

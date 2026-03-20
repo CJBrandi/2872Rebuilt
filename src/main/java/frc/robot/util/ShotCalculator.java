@@ -30,6 +30,8 @@ public class ShotCalculator {
 
   private static final double HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS = 4.6;
   private static final double LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS = 4.0;
+  private static final double LOB_PITCH_SCALE = 1.0;
+  private static final double LOB_EXIT_VELOCITY_SCALE = 1.0;
 
   private static final LoggedTunableNumber accelerationFilterTimeConstantSecs =
       new LoggedTunableNumber("ShotCalculator/AccelerationFilterTimeConstantSecs", 0.12);
@@ -258,9 +260,17 @@ public class ShotCalculator {
                 requiredFieldVelocity, predictedShooterFieldVelocity)
             : ShotVectorCompensator.fromShooterRelativeVector(requiredFieldVelocity);
 
-    Rotation2d turretAngle = normalizeTo0To2Pi(shot.yaw());
-    double pitchAngle = shot.pitch();
-    double exitVelocity = shot.exitVelocity();
+    ShootingParameters requestedShot =
+        new ShootingParameters(
+            normalizeTo0To2Pi(shot.yaw()), 0.0, shot.pitch(), 0.0, shot.exitVelocity());
+    boolean lobShot = isLobShotMode(selection.shotMode());
+    if (lobShot) {
+      requestedShot = applyLobScaling(requestedShot);
+    }
+
+    Rotation2d turretAngle = requestedShot.turretAngle();
+    double pitchAngle = requestedShot.pitchAngle();
+    double exitVelocity = requestedShot.exitVelocity();
 
     if (lastTurretAngle == null) lastTurretAngle = turretAngle;
     if (Double.isNaN(lastPitchAngle)) lastPitchAngle = pitchAngle;
@@ -283,6 +293,7 @@ public class ShotCalculator {
     Logger.recordOutput("ShotCalculator/VectorLookupLoaded", true);
     Logger.recordOutput("ShotCalculator/HubLookupLoaded", hubLookupProfile.loaded);
     Logger.recordOutput("ShotCalculator/ShotMode", selection.shotMode().name());
+    Logger.recordOutput("ShotCalculator/LobScalingApplied", lobShot);
     Logger.recordOutput("ShotCalculator/ShotStable", shotStable);
     Logger.recordOutput("ShotCalculator/SelectionRobotX", robotPose.getX());
     Logger.recordOutput("ShotCalculator/SelectionRobotY", robotPose.getY());
@@ -475,11 +486,24 @@ public class ShotCalculator {
     return Math.max(lookupProfile.minDistance, Math.min(lookupProfile.maxDistance, distance));
   }
 
+  static ShootingParameters applyLobScaling(ShootingParameters parameters) {
+    return new ShootingParameters(
+        parameters.turretAngle(),
+        parameters.turretVelocity(),
+        parameters.pitchAngle() * LOB_PITCH_SCALE,
+        parameters.pitchVelocity() * LOB_PITCH_SCALE,
+        parameters.exitVelocity() * LOB_EXIT_VELOCITY_SCALE);
+  }
+
   private Translation3d getLookupVector(double distance, LookupProfile lookupProfile) {
     return new Translation3d(
         lookupProfile.velocityVectorXMap.get(distance),
         lookupProfile.velocityVectorYMap.get(distance),
         lookupProfile.velocityVectorZMap.get(distance));
+  }
+
+  private static boolean isLobShotMode(ShotMode shotMode) {
+    return shotMode == ShotMode.LOB_LEFT || shotMode == ShotMode.LOB_RIGHT;
   }
 
   private static Rotation2d normalizeTo0To2Pi(Rotation2d angle) {

@@ -79,6 +79,7 @@ public class Turret {
   private boolean staticCharacterizationActive = false;
 
   private boolean closedLoop = false;
+  private boolean closedLoopActiveLastCycle = false;
 
   @Getter
   @AutoLogOutput(key = "Turret/Profile/AtGoal")
@@ -120,6 +121,7 @@ public class Turret {
       setpoint = new TrapezoidProfile.State(clampedAngle, 0.0);
       lastGoalAngle = clampedAngle;
       atGoal = false;
+      closedLoopActiveLastCycle = false;
 
       // Still publish turret observation for vision even when disabled
       RobotState.getInstance()
@@ -142,6 +144,11 @@ public class Turret {
     // Manual mode - use tunable angle as target
     if (manualMode && !staticCharacterizationActive) {
       setTargetTurretAngle(Rotation2d.fromDegrees(manualAngleDeg.get()));
+    }
+
+    if (closedLoop && !closedLoopActiveLastCycle) {
+      setpoint = synchronizeSetpointToMeasuredState();
+      lastGoalAngle = setpoint.position;
     }
 
     if (closedLoop
@@ -201,18 +208,20 @@ public class Turret {
       atGoal = false;
     }
 
+    closedLoopActiveLastCycle = closedLoop;
     logState();
     TurretVisualizer.update(inputs.motorEncoderPosition.getRadians());
   }
 
   private TurretLimits.Selection selectAbsoluteAngleWithinLimits(double requestedAngleRad) {
-    var selection = TurretLimits.selectAbsoluteAngleRadians(requestedAngleRad);
+    var selection = TurretLimits.selectAbsoluteAngleRadians(requestedAngleRad, setpoint.position);
     logAngleSelection("absolute", selection);
     return selection;
   }
 
   private TurretLimits.Selection selectFieldRelativeAngleWithinLimits(double requestedAngleRad) {
-    var selection = TurretLimits.selectFieldRelativeAngleRadians(requestedAngleRad);
+    var selection =
+        TurretLimits.selectFieldRelativeAngleRadians(requestedAngleRad, setpoint.position);
     logAngleSelection("field_relative", selection);
     return selection;
   }
@@ -220,9 +229,19 @@ public class Turret {
   private void logAngleSelection(String mode, TurretLimits.Selection selection) {
     Logger.recordOutput("Turret/Safety/SelectionMode", mode);
     Logger.recordOutput("Turret/Safety/RequestedAngleDeg", selection.requestedDeg());
+    Logger.recordOutput("Turret/Safety/ReferenceAngleDeg", selection.referenceDeg());
     Logger.recordOutput("Turret/Safety/CandidateAngleDeg", selection.candidateDeg());
     Logger.recordOutput("Turret/Safety/SelectedAngleDeg", selection.selectedDeg());
     Logger.recordOutput("Turret/Safety/SelectionClamped", selection.clamped());
+  }
+
+  private TrapezoidProfile.State synchronizeSetpointToMeasuredState() {
+    double clampedPosition = TurretLimits.clampRadians(inputs.motorEncoderPosition.getRadians());
+    double velocity = inputs.velocityRadPerSec;
+    if (TurretLimits.commandWouldPushPastLimit(clampedPosition, velocity)) {
+      velocity = 0.0;
+    }
+    return new TrapezoidProfile.State(clampedPosition, velocity);
   }
 
   private TrapezoidProfile.State clampSetpointToLimits(TrapezoidProfile.State state) {
