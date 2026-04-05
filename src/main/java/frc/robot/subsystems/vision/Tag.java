@@ -20,6 +20,7 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.subsystems.vision.TagIO.PoseObservationType;
@@ -34,7 +35,7 @@ public class Tag extends SubsystemBase {
   private final TagIOInputsAutoLogged[] inputs;
   private final Alert[] disconnectedAlerts;
   private final LoggedTunableNumber[] poseEstimationEnabledTunables;
-  private static LoggedTunableNumber strictFilter;
+  private final LoggedTunableNumber autoMaxPoseDeltaMeters;
 
   public Tag(TagConsumer consumer, TagIO... io) {
     this.consumer = consumer;
@@ -59,7 +60,7 @@ public class Tag extends SubsystemBase {
           new LoggedTunableNumber(
               "Tag/Camera" + Integer.toString(i) + "/PoseEstimationEnabled", 1.0);
     }
-    strictFilter = new LoggedTunableNumber("Tag/strictFilter", 0.0);
+    autoMaxPoseDeltaMeters = new LoggedTunableNumber("Tag/AutoMaxPoseDeltaMeters", 1.0);
   }
 
   /**
@@ -85,6 +86,10 @@ public class Tag extends SubsystemBase {
     List<Pose3d> allRobotPosesRejected = new LinkedList<>();
     List<Pose3d> allCameraFieldPoses = new LinkedList<>();
     Pose3d robotFieldPose = new Pose3d(RobotState.getInstance().getRobotPose());
+    Pose2d estimatedRobotPose = RobotState.getInstance().getRobotPose();
+    boolean autoStrictFilterEnabled =
+        DriverStation.isAutonomousEnabled() && autoMaxPoseDeltaMeters.get() > 0.0;
+    Logger.recordOutput("Tag/AutoStrictFilterEnabled", autoStrictFilterEnabled);
 
     // Loop over cameras
     for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
@@ -108,40 +113,25 @@ public class Tag extends SubsystemBase {
 
       // Loop over pose observations
       for (var observation : inputs[cameraIndex].poseObservations) {
-        boolean rejectPose;
-        if (strictFilter.get() > 0.5 || RobotState.getInstance().isStrictPoseEstimation()) {
-          rejectPose =
-              observation.tagCount() == 0 // Must have at least one tag
-                  || (observation.tagCount() == 1
-                      && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
-                  || Math.abs(observation.pose().getZ())
-                      > maxZError // Must have realistic Z coordinate
+        double poseDeltaMeters =
+            observation
+                .pose()
+                .toPose2d()
+                .getTranslation()
+                .getDistance(estimatedRobotPose.getTranslation());
+        boolean rejectPose =
+            observation.tagCount() == 0 // Must have at least one tag
+                || (observation.tagCount() == 1
+                    && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
+                || Math.abs(observation.pose().getZ())
+                    > maxZError // Must have realistic Z coordinate
 
-                  // Must be within the field boundaries
-                  || observation.pose().getX() < 0.0
-                  || observation.pose().getX() > aprilTagLayout.getFieldLength()
-                  || observation.pose().getY() < 0.0
-                  || observation.pose().getY() > aprilTagLayout.getFieldWidth()
-                  || observation
-                          .pose()
-                          .toPose2d()
-                          .getTranslation()
-                          .getDistance(RobotState.getInstance().getRobotPose().getTranslation())
-                      > 1;
-        } else {
-          rejectPose =
-              observation.tagCount() == 0 // Must have at least one tag
-                  || (observation.tagCount() == 1
-                      && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
-                  || Math.abs(observation.pose().getZ())
-                      > maxZError // Must have realistic Z coordinate
-
-                  // Must be within the field boundaries
-                  || observation.pose().getX() < 0.0
-                  || observation.pose().getX() > aprilTagLayout.getFieldLength()
-                  || observation.pose().getY() < 0.0
-                  || observation.pose().getY() > aprilTagLayout.getFieldWidth();
-        }
+                // Must be within the field boundaries
+                || observation.pose().getX() < 0.0
+                || observation.pose().getX() > aprilTagLayout.getFieldLength()
+                || observation.pose().getY() < 0.0
+                || observation.pose().getY() > aprilTagLayout.getFieldWidth()
+                || (autoStrictFilterEnabled && poseDeltaMeters > autoMaxPoseDeltaMeters.get());
         // Add pose to log
         robotPoses.add(observation.pose());
         if (rejectPose) {

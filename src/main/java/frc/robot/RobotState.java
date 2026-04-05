@@ -27,7 +27,6 @@ public class RobotState {
   @Getter @Setter private ChassisSpeeds robotVelocity = new ChassisSpeeds();
   @Getter private Translation2d bestFuelCluster = new Translation2d();
   @Getter private boolean hasBestFuelCluster = false;
-  @Setter @Getter boolean strictPoseEstimation = false;
 
   @Getter @Setter private boolean autoEmpty = false;
   @Getter @Setter private TurretShooterMode turretShooterRequestedMode = TurretShooterMode.SOTM;

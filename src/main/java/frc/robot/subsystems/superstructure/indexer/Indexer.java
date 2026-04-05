@@ -95,7 +95,7 @@ public class Indexer {
         unjamForwardTimeSecs.initDefault(0.06);
       }
     }
-    intakeRPM.initDefault(70.0);
+    intakeRPM.initDefault(110.0);
   }
 
   private enum AutoUnjamState {

@@ -42,8 +42,8 @@ public class Turret {
         kD.initDefault(0);
         kS.initDefault(0.2);
         kV.initDefault(0.0);
-        maxVelocityDegPerSec.initDefault(360);
-        maxAccelerationDegPerSec2.initDefault(720);
+        maxVelocityDegPerSec.initDefault(2880);
+        maxAccelerationDegPerSec2.initDefault(1440);
       }
       case SIM, REPLAY -> {
         kP.initDefault(8000);

@@ -37,8 +37,9 @@ public class RollerIOTalonFX implements RollerIO {
   private final StatusSignal<Temperature> tempCelsius;
 
   // Control requests
-  private final VelocityVoltage velocityVoltage = new VelocityVoltage(0.0).withUpdateFreqHz(0.0);
-  //private final TorqueCurrentFOC torqueCurrentFOC = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+  private final VelocityTorqueCurrentFOC velocityTorqueCurrentFOC =
+      new VelocityTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+  private final TorqueCurrentFOC torqueCurrentFOC = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final VoltageOut voltageOut = new VoltageOut(0.0).withUpdateFreqHz(0);
   private final NeutralOut neutralOut = new NeutralOut();
 
@@ -96,12 +97,12 @@ public class RollerIOTalonFX implements RollerIO {
 
   @Override
   public void runVelocity(double velocityRPS) {
-    talon.setControl(velocityVoltage.withVelocity(velocityRPS));
+    talon.setControl(velocityTorqueCurrentFOC.withVelocity(velocityRPS));
   }
 
   @Override
   public void runTorqueCurrent(double current) {
-    //talon.setControl(torqueCurrentFOC.withOutput(current));
+    talon.setControl(torqueCurrentFOC.withOutput(current));
   }
 
   @Override

@@ -57,9 +57,9 @@ public class IndexerIOTalonFX implements IndexerIO {
     config.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
     config.Slot0 = new Slot0Configs().withKS(0.0).withKV(0.0).withKP(0.0).withKI(0.0).withKD(0.0);
     config.Feedback.SensorToMechanismRatio = REDUCTION;
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 40.0;
-    config.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
-    config.CurrentLimits.StatorCurrentLimit = 40.0;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 60.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -60.0;
+    config.CurrentLimits.StatorCurrentLimit = 80.0;
     config.CurrentLimits.StatorCurrentLimitEnable = true;
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 

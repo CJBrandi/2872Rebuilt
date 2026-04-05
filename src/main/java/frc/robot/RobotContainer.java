@@ -266,6 +266,7 @@ public class RobotContainer {
     auto.addOption("Right middle outpost", autos.RIGHT_MID_OUTPOST());
     auto.addOption("Left middle double", autos.LEFT_MID_DOUBLE());
     auto.addOption("Left middle depot", autos.LEFT_MID_DEPOT());
+    // auto.addOption("Middle outpost", autos.MIDDLE_OUTPOST());
     // Set up SysId routines
     characterizer.addOption(
         "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));
@@ -330,21 +331,51 @@ public class RobotContainer {
                             new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
                     drive)
                 .ignoringDisable(true));
-
-    controller.povUp().onTrue(Commands.runOnce(intake::stow, intake));
-    controller.povDown().onTrue(Commands.runOnce(intake::deploy, intake));
-    controller.leftBumper().onTrue(Commands.runOnce(intake::toggleIntake, intake));
-    controller.y().onTrue(Commands.runOnce(() -> intake.getRoller().runEject()));
-    controller.y().onFalse(Commands.runOnce(() -> intake.getRoller().runEject()));
-
     controller
-        .rightBumper()
+        .povUp()
         .onTrue(
             Commands.runOnce(
-                    () ->
-                        RobotState.getInstance()
-                            .setAutoEmpty(!RobotState.getInstance().isAutoEmpty()))
-                .ignoringDisable(true));
+                () -> {
+                  intake.stow();
+                  RobotState.getInstance()
+                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL);
+                  superstructure.getTurret().setTargetTurretAngle(Rotation2d.k180deg);
+                },
+                intake));
+    controller
+        .povDown()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  intake.deploy();
+                  RobotState.getInstance()
+                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM);
+                },
+                intake));
+
+    controller
+        .leftTrigger()
+        .onTrue(Commands.runOnce(intake::toggleIntake, intake))
+        .onFalse(Commands.runOnce(intake::toggleIntake, intake));
+    controller
+        .y()
+        .onTrue(
+            Commands.runOnce(
+                () -> intake.getRoller().setTemporaryVelocityOverride(Roller.ejectVelocity.get()),
+                intake.getRoller()));
+    controller
+        .y()
+        .onFalse(
+            Commands.runOnce(
+                intake.getRoller()::clearTemporaryVelocityOverride, intake.getRoller()));
+    controller.x().onTrue(superstructure.getShooter().hoodHomingCommand());
+
+    controller
+        .rightTrigger()
+        .onTrue(
+            Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true))
+                .ignoringDisable(true))
+        .onFalse(Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)));
   }
 
   /**

@@ -10,6 +10,7 @@ import org.littletonrobotics.junction.Logger;
 
 @Getter
 public class Shooter {
+  private static final double HORIZONTAL_REFERENCE_RAD = Math.PI / 2.0;
 
   // Manual mode tunable numbers (shared with Turret via same NT key)
   private static final LoggedTunableNumber manualModeEnabled =
@@ -52,7 +53,10 @@ public class Shooter {
     } else if (manualMode) {
       hood.setTargetAngle(Math.toRadians(manualHoodAngleDeg.get()), 0.0);
     } else {
-      hood.setTargetAngle(Math.toRadians(90) - goalHoodAngleRad, goalHoodVelocityRadPerSec);
+      // Shot pitch is measured from horizontal, while the hood mechanism rotates opposite that.
+      hood.setTargetAngle(
+          pitchToHoodAngleRad(goalHoodAngleRad),
+          pitchToHoodVelocityRadPerSec(goalHoodVelocityRadPerSec));
     }
 
     flywheel.periodic();
@@ -69,6 +73,14 @@ public class Shooter {
     this.goalExitVelocityMps = exitVelocityMps;
     this.goalHoodAngleRad = hoodAngleRad;
     this.goalHoodVelocityRadPerSec = hoodVelocityRadPerSec;
+  }
+
+  static double pitchToHoodAngleRad(double pitchAngleRad) {
+    return HORIZONTAL_REFERENCE_RAD - pitchAngleRad;
+  }
+
+  static double pitchToHoodVelocityRadPerSec(double pitchVelocityRadPerSec) {
+    return -pitchVelocityRadPerSec;
   }
 
   public void setGoals(double exitVelocityMps, double hoodAngleRad) {

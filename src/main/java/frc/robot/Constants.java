@@ -98,8 +98,8 @@ public final class Constants {
       public static final int canId = 60;
       public static final String canBus = "";
       public static final double reduction = 40.66;
-      public static final double minAngleDeg = 45;
-      public static final double maxAngleDeg = -470.0;
+      public static final double minAngleDeg = 25;
+      public static final double maxAngleDeg = -380;
     }
 
     public static class ShooterConstants {

@@ -104,13 +104,10 @@ public class Superstructure extends SubsystemBase {
 
   @AutoLogOutput(key = "Superstructure/ReadyToShoot")
   public boolean isReadyToShoot() {
-    boolean requiresStabilityGate = activeTurretShooterMode != RobotState.TurretShooterMode.MANUAL;
-
     return RobotState.getInstance().isAutoEmpty()
         && !trenchStowActive
         && shooter.isReady()
-        && turret.isAtGoal()
-        && (!requiresStabilityGate || shotCalculator.isShotStable());
+        && turret.isAtGoal();
   }
 
   private boolean shouldStowHoodForTrench() {

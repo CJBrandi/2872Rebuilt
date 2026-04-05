@@ -19,10 +19,11 @@ import org.littletonrobotics.junction.Logger;
  * a Subsystem - it's managed by Shooter.
  */
 public class Hood {
+  private static final double LIMIT_EPSILON_RAD = 1e-9;
 
   // Hood angle limits (radians)
   private static final double MIN_ANGLE_RAD = Math.toRadians(15.5);
-  private static final double MAX_ANGLE_RAD = MIN_ANGLE_RAD + Math.toRadians(34.5);
+  private static final double MAX_ANGLE_RAD = MIN_ANGLE_RAD + Math.toRadians(30.0);
 
   // PID gains (output in Amps for TorqueCurrentFOC)
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Hood/kP");
@@ -50,9 +51,9 @@ public class Hood {
     switch (Constants.getCurrentMode()) {
       case REAL -> {
         kP.initDefault(2500);
-        kD.initDefault(40);
-        kS.initDefault(5);
-        kG.initDefault(5);
+        kD.initDefault(45);
+        kS.initDefault(3);
+        kG.initDefault(0);
         maxVelocityDegPerSec.initDefault(360);
         maxAccelerationDegPerSec2.initDefault(720);
       }
@@ -103,6 +104,8 @@ public class Hood {
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Shooter/Hood", inputs);
+    double clampedTargetAngleRad = clampAngleRad(targetAngleRad);
+    boolean setpointClamped = false;
 
     // Update PID gains if changed
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
@@ -121,12 +124,14 @@ public class Hood {
 
     // Run closed loop control (skip if stopProfile is set for characterization or not homed)
     if (closedLoop && !stopProfile && homed) {
-      // Clamp target to limits
-      double clampedTarget = MathUtil.clamp(targetAngleRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD);
-
       // Create goal state with feedforward velocity
-      var goalState = new TrapezoidProfile.State(clampedTarget, targetVelocityRadPerSec);
-      setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
+      var goalState = new TrapezoidProfile.State(clampedTargetAngleRad, targetVelocityRadPerSec);
+      TrapezoidProfile.State profiledSetpoint =
+          profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
+      setpoint = clampStateToLimits(profiledSetpoint);
+      setpointClamped =
+          Math.abs(setpoint.position - profiledSetpoint.position) > LIMIT_EPSILON_RAD
+              || Math.abs(setpoint.velocity - profiledSetpoint.velocity) > LIMIT_EPSILON_RAD;
 
       // Calculate feedforward in Amps: kS for static friction, kG for gravity
       double feedforwardAmps =
@@ -138,22 +143,24 @@ public class Hood {
       // Check if at goal (compare actual position, not profile setpoint)
       atGoal =
           EqualsUtil.epsilonEquals(
-              inputs.positionRad, goalState.position, Units.degreesToRadians(1));
+              inputs.positionRad, clampedTargetAngleRad, Units.degreesToRadians(5));
     } else {
       atGoal = false;
     }
 
     // Logging
-    Logger.recordOutput("Shooter/Hood/TargetAngleDeg", Math.toDegrees(targetAngleRad));
+    Logger.recordOutput("Shooter/Hood/TargetAngleRawDeg", Math.toDegrees(targetAngleRad));
+    Logger.recordOutput("Shooter/Hood/TargetAngleDeg", Math.toDegrees(clampedTargetAngleRad));
+    Logger.recordOutput(
+        "Shooter/Hood/TargetAngleClampedDeg", Math.toDegrees(clampedTargetAngleRad));
     Logger.recordOutput("Shooter/Hood/SetpointAngleDeg", Math.toDegrees(setpoint.position));
+    Logger.recordOutput("Shooter/Hood/SetpointClamped", setpointClamped);
     Logger.recordOutput("Shooter/Hood/MeasuredAngleDeg", Math.toDegrees(inputs.positionRad));
     Logger.recordOutput("Shooter/Hood/AtGoal", atGoal);
     Logger.recordOutput("Shooter/Hood/ClosedLoop", closedLoop);
     Logger.recordOutput("Shooter/Hood/Homed", homed);
     Logger.recordOutput(
-        "Shooter/Hood/TargetClampErrorDeg",
-        Math.toDegrees(
-            targetAngleRad - MathUtil.clamp(targetAngleRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD)));
+        "Shooter/Hood/TargetClampErrorDeg", Math.toDegrees(targetAngleRad - clampedTargetAngleRad));
   }
 
   /**
@@ -207,6 +214,28 @@ public class Hood {
   public void resetPosition(double radians) {
     io.setPosition(radians);
     setpoint = new TrapezoidProfile.State(radians, 0.0);
+  }
+
+  static double clampAngleRad(double angleRad) {
+    return MathUtil.clamp(angleRad, MIN_ANGLE_RAD, MAX_ANGLE_RAD);
+  }
+
+  static boolean commandWouldPushPastLimit(double positionRad, double velocityRadPerSec) {
+    return (positionRad <= MIN_ANGLE_RAD + LIMIT_EPSILON_RAD && velocityRadPerSec < 0.0)
+        || (positionRad >= MAX_ANGLE_RAD - LIMIT_EPSILON_RAD && velocityRadPerSec > 0.0);
+  }
+
+  static TrapezoidProfile.State clampStateToLimits(TrapezoidProfile.State state) {
+    double clampedPosition = clampAngleRad(state.position);
+    double velocity = state.velocity;
+    if (commandWouldPushPastLimit(clampedPosition, velocity)) {
+      velocity = 0.0;
+    }
+    if (Math.abs(clampedPosition - state.position) <= LIMIT_EPSILON_RAD
+        && Math.abs(velocity - state.velocity) <= LIMIT_EPSILON_RAD) {
+      return state;
+    }
+    return new TrapezoidProfile.State(clampedPosition, velocity);
   }
 
   public boolean isMotorConnected() {

@@ -47,11 +47,13 @@ public class Intake extends SubsystemBase {
 
   public void stow() {
     requestedPivotGoal = () -> stowedAngle;
+    runningIntake = false;
     roller.stop();
   }
 
   public void deploy() {
     requestedPivotGoal = () -> groundAngle;
+    runningIntake = true;
     roller.runIntake();
   }
 

@@ -19,6 +19,15 @@ import lombok.Getter;
 import org.littletonrobotics.junction.Logger;
 
 public class Roller extends SubsystemBase {
+  private enum ControlMode {
+    VELOCITY,
+    VOLTS,
+    TORQUE_CURRENT,
+    STOPPED
+  }
+
+  private record ControlRequest(ControlMode mode, double value) {}
+
   // Manual mode tunables
   private static final LoggedTunableNumber manualModeEnabled =
       new LoggedTunableNumber("Manual/Enabled", 0.0);
@@ -79,6 +88,9 @@ public class Roller extends SubsystemBase {
   @Getter private double targetVelocityRPS = 0.0;
   @Getter private boolean atSetpoint = false;
   private boolean closedLoop = false;
+  private ControlRequest requestedControl = new ControlRequest(ControlMode.STOPPED, 0.0);
+  @Getter private boolean temporaryVelocityOverrideActive = false;
+  private double temporaryVelocityOverrideRPS = 0.0;
   // Disconnected alerts
   private final Alert motorDisconnectedAlert =
       new Alert("Intake roller motor disconnected!", Alert.AlertType.kWarning);
@@ -140,6 +152,11 @@ public class Roller extends SubsystemBase {
     Logger.recordOutput("Intake/Roller/TargetVelocityRPM", targetVelocityRPS * 60.0);
     Logger.recordOutput(
         "Intake/Roller/SetpointVelocityRPM", closedLoop ? setpoint.velocity * 60.0 : 0.0);
+    Logger.recordOutput(
+        "Intake/Roller/TemporaryVelocityOverrideActive", temporaryVelocityOverrideActive);
+    Logger.recordOutput(
+        "Intake/Roller/TemporaryVelocityOverrideRPM",
+        temporaryVelocityOverrideActive ? temporaryVelocityOverrideRPS * 60.0 : 0.0);
     Logger.recordOutput("Intake/Roller/ManualModeEnabled", manualMode);
     Logger.recordOutput("Intake/Roller/Manual/TargetRPM", manualRollerRPM.get());
 
@@ -162,6 +179,43 @@ public class Roller extends SubsystemBase {
 
   /** Run roller at velocity (rotations per second) using torque current control */
   public void runVelocity(double velocityRPS) {
+    setRequestedControl(new ControlRequest(ControlMode.VELOCITY, velocityRPS));
+  }
+
+  /** Temporarily override the roller velocity until cleared. */
+  public void setTemporaryVelocityOverride(double velocityRPS) {
+    temporaryVelocityOverrideActive = true;
+    temporaryVelocityOverrideRPS = velocityRPS;
+    applyVelocityRequest(velocityRPS);
+  }
+
+  /** Clears any temporary velocity override and restores the latest requested control state. */
+  public void clearTemporaryVelocityOverride() {
+    if (!temporaryVelocityOverrideActive) {
+      return;
+    }
+
+    temporaryVelocityOverrideActive = false;
+    applyControlRequest(requestedControl);
+  }
+
+  private void setRequestedControl(ControlRequest request) {
+    requestedControl = request;
+    if (!temporaryVelocityOverrideActive) {
+      applyControlRequest(request);
+    }
+  }
+
+  private void applyControlRequest(ControlRequest request) {
+    switch (request.mode()) {
+      case VELOCITY -> applyVelocityRequest(request.value());
+      case VOLTS -> applyVoltageRequest(request.value());
+      case TORQUE_CURRENT -> applyTorqueCurrentRequest(request.value());
+      case STOPPED -> applyStopRequest();
+    }
+  }
+
+  private void applyVelocityRequest(double velocityRPS) {
     if (!closedLoop) {
       // Seed profile state from measured velocity for a bumpless transfer to closed-loop.
       setpoint = new TrapezoidProfile.State(0.0, getMeasuredVelocityRPS());
@@ -170,6 +224,24 @@ public class Roller extends SubsystemBase {
 
     closedLoop = true;
     targetVelocityRPS = velocityRPS;
+  }
+
+  private void applyVoltageRequest(double volts) {
+    closedLoop = false;
+    targetVelocityRPS = 0.0;
+    io.runVolts(volts);
+  }
+
+  private void applyTorqueCurrentRequest(double current) {
+    closedLoop = false;
+    targetVelocityRPS = 0.0;
+    io.runTorqueCurrent(current);
+  }
+
+  private void applyStopRequest() {
+    closedLoop = false;
+    targetVelocityRPS = 0.0;
+    io.stop();
   }
 
   /** Run roller at intake velocity */
@@ -194,23 +266,17 @@ public class Roller extends SubsystemBase {
 
   /** Run roller at voltage */
   public void runVolts(double volts) {
-    closedLoop = false;
-    targetVelocityRPS = 0.0;
-    io.runVolts(volts);
+    setRequestedControl(new ControlRequest(ControlMode.VOLTS, volts));
   }
 
   /** Run roller at torque current */
   public void runTorqueCurrent(double current) {
-    closedLoop = false;
-    targetVelocityRPS = 0.0;
-    io.runTorqueCurrent(current);
+    setRequestedControl(new ControlRequest(ControlMode.TORQUE_CURRENT, current));
   }
 
   /** Stop the roller */
   public void stop() {
-    closedLoop = false;
-    targetVelocityRPS = 0.0;
-    io.stop();
+    setRequestedControl(new ControlRequest(ControlMode.STOPPED, 0.0));
   }
   /** Set brake mode */
   public void setBrakeMode(boolean enabled) {

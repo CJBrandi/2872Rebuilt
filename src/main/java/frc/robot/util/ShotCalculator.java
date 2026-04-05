@@ -30,8 +30,8 @@ public class ShotCalculator {
 
   private static final double HUB_LOOKUP_SELECTION_X_THRESHOLD_METERS = 4.6;
   private static final double LOB_LOOKUP_SELECTION_Y_THRESHOLD_METERS = 4.0;
-  private static final double LOB_PITCH_SCALE = 1.0;
-  private static final double LOB_EXIT_VELOCITY_SCALE = 1.0;
+  private static final double LOB_PITCH_SCALE = 0.8;
+  private static final double LOB_EXIT_VELOCITY_SCALE = 0.8;
 
   private static final LoggedTunableNumber accelerationFilterTimeConstantSecs =
       new LoggedTunableNumber("ShotCalculator/AccelerationFilterTimeConstantSecs", 0.12);
