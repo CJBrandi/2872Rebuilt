@@ -6,6 +6,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.RobotState;
 import frc.robot.commands.DriveCommands;
 import frc.robot.subsystems.drive.Drive;
@@ -92,6 +93,10 @@ public final class CrazyModeBindings {
                 () -> superstructure.getIndexer().runVolts(-2.0),
                 superstructure.getIndexer()::stop));
 
-    driver.start().and(driver.back()).onTrue(orchestraCommand);
+    bindOrchestraCommand(driver.start().and(driver.back()), orchestraCommand);
+  }
+
+  static void bindOrchestraCommand(Trigger songButtons, Command orchestraCommand) {
+    songButtons.whileTrue(orchestraCommand);
   }
 }
