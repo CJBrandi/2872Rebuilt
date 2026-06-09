@@ -3,6 +3,7 @@ package frc.robot.controls;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.RobotState;
@@ -17,7 +18,11 @@ public final class CrazyModeBindings {
   private CrazyModeBindings() {}
 
   public static void configure(
-      CommandXboxController driver, Drive drive, Intake intake, Superstructure superstructure) {
+      CommandXboxController driver,
+      Drive drive,
+      Intake intake,
+      Superstructure superstructure,
+      Command orchestraCommand) {
     drive.setDefaultCommand(
         DriveCommands.joystickDrive(
             drive, () -> -driver.getLeftY(), () -> -driver.getLeftX(), () -> -driver.getRightX()));
@@ -86,5 +91,7 @@ public final class CrazyModeBindings {
             Commands.startEnd(
                 () -> superstructure.getIndexer().runVolts(-2.0),
                 superstructure.getIndexer()::stop));
+
+    driver.start().and(driver.back()).onTrue(orchestraCommand);
   }
 }

@@ -12,6 +12,7 @@ import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
@@ -19,9 +20,11 @@ import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
 import frc.robot.Constants;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 
 /** Flywheel IO implementation using TalonFX (Falcon 500 / Kraken X60). */
-public class FlywheelIOTalonFX implements FlywheelIO {
+public class FlywheelIOTalonFX implements FlywheelIO, OrchestraInstrumentProvider {
   // stepUp = flywheel speed / motor speed, but Talon expects sensor/mechanism ratio.
   // Integrated sensor is on the motor, so sensor/mechanism = 1 / stepUp.
   private static final double sensorToMechanismRatio =
@@ -99,6 +102,12 @@ public class FlywheelIOTalonFX implements FlywheelIO {
         followerSupplyCurrent,
         followerTemp);
     ParentDevice.optimizeBusUtilizationForAll(talon, followerTalon);
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(talon);
+    instruments.add(followerTalon);
   }
 
   @Override

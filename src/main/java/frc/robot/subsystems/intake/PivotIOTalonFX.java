@@ -19,14 +19,17 @@ import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.FeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.*;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 
-public class PivotIOTalonFX implements PivotIO {
+public class PivotIOTalonFX implements PivotIO, OrchestraInstrumentProvider {
   private static final Rotation2d offset = new Rotation2d();
 
   // Gear train: Motor → 22t gear → 30t gear → 12t sprocket → 22t sprocket → 23:1 cycloidal
@@ -98,6 +101,11 @@ public class PivotIOTalonFX implements PivotIO {
         current,
         temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(talon);
   }
 
   @Override

@@ -16,14 +16,17 @@ import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 
 /** Roller IO implementation using a Kraken X44. */
-public class RollerIOTalonFX implements RollerIO {
+public class RollerIOTalonFX implements RollerIO, OrchestraInstrumentProvider {
   private final TalonFX talon;
 
   // Config
@@ -78,6 +81,11 @@ public class RollerIOTalonFX implements RollerIO {
                 torqueCurrent,
                 tempCelsius));
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(talon);
   }
 
   @Override

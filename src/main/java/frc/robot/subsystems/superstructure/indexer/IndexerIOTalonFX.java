@@ -11,6 +11,7 @@ import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
@@ -20,9 +21,11 @@ import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
 import frc.robot.Constants;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 
 /** Indexer IO implementation using TalonFX (Kraken X60). */
-public class IndexerIOTalonFX implements IndexerIO {
+public class IndexerIOTalonFX implements IndexerIO, OrchestraInstrumentProvider {
   private static final double REDUCTION =
       Constants.SuperstructureConstants.IndexerConstants.reduction;
 
@@ -72,6 +75,11 @@ public class IndexerIOTalonFX implements IndexerIO {
     BaseStatusSignal.setUpdateFrequencyForAll(
         250.0, velocity, appliedVolts, torqueCurrent, supplyCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(talon);
   }
 
   @Override

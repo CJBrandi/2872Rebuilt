@@ -9,6 +9,7 @@ package frc.robot;
 
 import static frc.robot.subsystems.vision.VisionConstants.*;
 
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.system.plant.DCMotor;
@@ -21,6 +22,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
+import frc.robot.commands.OrchestraCommand;
 import frc.robot.controls.CrazyModeBindings;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.*;
@@ -41,6 +43,9 @@ import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
 import frc.robot.subsystems.vision.*;
 import frc.robot.util.Autos;
 import frc.robot.util.FuelSim;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.ArrayList;
+import java.util.List;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -57,6 +62,7 @@ public class RobotContainer {
   private final Intake intake;
   private Tag tag;
   private Detection detection;
+  private final Command orchestraCommand;
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
@@ -68,6 +74,7 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+    List<CommonDevice> orchestraInstruments = new ArrayList<>();
     TagCameraConfig runtimeCamera0Config =
         camera0Config.withTurretAngleAtTimestamp(
             timestampSeconds -> RobotState.getInstance().getTurretAngleAtTime(timestampSeconds));
@@ -76,43 +83,56 @@ public class RobotContainer {
 
     switch (Constants.getCurrentMode()) {
       case REAL:
+        ModuleIOTalonFX frontLeftModule = new ModuleIOTalonFX(TunerConstants.FrontLeft);
+        ModuleIOTalonFX frontRightModule = new ModuleIOTalonFX(TunerConstants.FrontRight);
+        ModuleIOTalonFX backLeftModule = new ModuleIOTalonFX(TunerConstants.BackLeft);
+        ModuleIOTalonFX backRightModule = new ModuleIOTalonFX(TunerConstants.BackRight);
+        addOrchestraInstruments(
+            orchestraInstruments,
+            frontLeftModule,
+            frontRightModule,
+            backLeftModule,
+            backRightModule);
         drive =
             new Drive(
                 new GyroIOPigeon2(),
-                new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                new ModuleIOTalonFX(TunerConstants.FrontRight),
-                new ModuleIOTalonFX(TunerConstants.BackLeft),
-                new ModuleIOTalonFX(TunerConstants.BackRight));
+                frontLeftModule,
+                frontRightModule,
+                backLeftModule,
+                backRightModule);
 
-        intake =
-            new Intake(
-                new PivotIOTalonFX(
-                    Constants.IntakeConstants.PivotConstants.canId,
-                    Constants.IntakeConstants.canBus),
-                new RollerIOTalonFX(
-                    Constants.IntakeConstants.RollerConstants.canId,
-                    Constants.IntakeConstants.canBus));
+        PivotIOTalonFX pivotIO =
+            new PivotIOTalonFX(
+                Constants.IntakeConstants.PivotConstants.canId, Constants.IntakeConstants.canBus);
+        RollerIOTalonFX rollerIO =
+            new RollerIOTalonFX(
+                Constants.IntakeConstants.RollerConstants.canId, Constants.IntakeConstants.canBus);
+        addOrchestraInstruments(orchestraInstruments, pivotIO, rollerIO);
+        intake = new Intake(pivotIO, rollerIO);
 
+        FlywheelIOTalonFX flywheelIO =
+            new FlywheelIOTalonFX(
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.followerCanId,
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canBus);
+        HoodIOTalonFX hoodIO =
+            new HoodIOTalonFX(
+                Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
+                Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus);
+        TurretIOTalonFX turretIO =
+            new TurretIOTalonFX(
+                Constants.SuperstructureConstants.TurretConstants.canId,
+                Constants.SuperstructureConstants.TurretConstants.canBus);
+        IndexerIOTalonFX indexerIO =
+            new IndexerIOTalonFX(
+                Constants.SuperstructureConstants.IndexerConstants.canId,
+                Constants.SuperstructureConstants.IndexerConstants.canBus);
+        addOrchestraInstruments(orchestraInstruments, flywheelIO, hoodIO, turretIO, indexerIO);
         superstructure =
             new Superstructure(
-                new Shooter(
-                    new FlywheelIOTalonFX(
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
-                            .followerCanId,
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
-                            .canBus),
-                    new HoodIOTalonFX(
-                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
-                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus)),
-                new Turret(
-                    new TurretIOTalonFX(
-                        Constants.SuperstructureConstants.TurretConstants.canId,
-                        Constants.SuperstructureConstants.TurretConstants.canBus)),
-                new Indexer(
-                    new IndexerIOTalonFX(
-                        Constants.SuperstructureConstants.IndexerConstants.canId,
-                        Constants.SuperstructureConstants.IndexerConstants.canBus)),
+                new Shooter(flywheelIO, hoodIO),
+                new Turret(turretIO),
+                new Indexer(indexerIO),
                 intake);
 
         elevator = new Elevator(new ElevatorIO() {});
@@ -185,6 +205,12 @@ public class RobotContainer {
         detection = new Detection(drive::getPose, new DetectionIO() {});
         break;
     }
+    orchestraCommand =
+        orchestraInstruments.isEmpty()
+            ? Commands.none()
+            : new OrchestraCommand(
+                orchestraInstruments, "nyancat.chrp", drive, intake, superstructure);
+
     // Initialize FuelSim in simulation mode
     if (Constants.currentMode == Constants.Mode.SIM) {
       FuelSim fuelSim = FuelSim.getInstance();
@@ -314,7 +340,14 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    CrazyModeBindings.configure(controller, drive, intake, superstructure);
+    CrazyModeBindings.configure(controller, drive, intake, superstructure, orchestraCommand);
+  }
+
+  private static void addOrchestraInstruments(
+      List<CommonDevice> instruments, OrchestraInstrumentProvider... providers) {
+    for (var provider : providers) {
+      provider.addOrchestraInstruments(instruments);
+    }
   }
 
   /**

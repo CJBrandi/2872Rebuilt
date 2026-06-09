@@ -9,6 +9,7 @@ import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
@@ -21,9 +22,11 @@ import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DigitalInput;
 import frc.robot.Constants;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 
 /** Turret IO implementation using TalonFX (Kraken X60). */
-public class TurretIOTalonFX implements TurretIO {
+public class TurretIOTalonFX implements TurretIO, OrchestraInstrumentProvider {
   private static final double GEAR_RATIO =
       Constants.SuperstructureConstants.TurretConstants.reduction;
 
@@ -96,6 +99,11 @@ public class TurretIOTalonFX implements TurretIO {
     talon.optimizeBusUtilization();
 
     talon.setPosition(Units.degreesToRotations(-180));
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(talon);
   }
 
   @Override

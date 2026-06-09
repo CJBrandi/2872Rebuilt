@@ -19,6 +19,7 @@ import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.CANdi;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFXS;
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import com.ctre.phoenix6.signals.BrushedMotorWiringValue;
 import com.ctre.phoenix6.signals.ExternalFeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -33,6 +34,8 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Voltage;
 import frc.robot.generated.TunerConstants;
+import frc.robot.util.OrchestraInstrumentProvider;
+import java.util.List;
 import java.util.Queue;
 
 /**
@@ -41,7 +44,7 @@ import java.util.Queue;
  *
  * <p>Device configuration and other behaviors not exposed by TunerConstants can be customized here.
  */
-public class ModuleIOTalonFXS implements ModuleIO {
+public class ModuleIOTalonFXS implements ModuleIO, OrchestraInstrumentProvider {
   // Hardware objects
   private final TalonFXS driveTalon;
   private final TalonFXS turnTalon;
@@ -185,6 +188,12 @@ public class ModuleIOTalonFXS implements ModuleIO {
         turnAppliedVolts,
         turnCurrent);
     ParentDevice.optimizeBusUtilizationForAll(driveTalon, turnTalon);
+  }
+
+  @Override
+  public void addOrchestraInstruments(List<CommonDevice> instruments) {
+    instruments.add(driveTalon);
+    instruments.add(turnTalon);
   }
 
   @Override
