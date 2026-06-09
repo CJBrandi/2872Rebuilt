@@ -135,6 +135,7 @@ public class Robot extends LoggedRobot {
     scheduleHomingOncePerBoot();
     RobotState.getInstance().setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM);
     RobotState.getInstance().setAutoEmpty(false);
+    RobotState.getInstance().setFerryShotRequested(false);
 
     if (autonomousCommand != null) {
       autonomousCommand.cancel();

@@ -17,6 +17,7 @@ Keep `RobotContainer` focused on wiring, chooser setup, and driver bindings. New
 - `robotPose` and `robotVelocity`
 - best fuel cluster state for pickup
 - `autoEmpty`, used as the shoot/feed request
+- `ferryShotRequested`, used by controls to request automatic neutral-zone ferry targeting
 - requested and active `TurretShooterMode`
 - a timestamped turret-angle buffer for vision pose estimation
 
@@ -33,8 +34,8 @@ The turret publishes observations every periodic cycle, including while disabled
 
 `Superstructure.periodic()` is the normal place for shot-mode resolution and coordinated behavior. It:
 
-- resolves requested mode to active mode, with `Manual/Enabled` overriding to `MANUAL`
-- configures `ShotCalculator` for SOTM, aim, or manual
+- resolves requested mode automatically, with `Manual/Enabled` overriding to `MANUAL`
+- configures `ShotCalculator` for static or shoot-on-the-move compensation from robot velocity
 - auto-deploys the intake near trench crossings when needed
 - forces the hood to minimum near trench crossings once the hood is homed
 - sends shot calculator goals to shooter and turret when not manual
@@ -97,6 +98,8 @@ Do not add a turret command path that bypasses `TurretLimits` or the existing pr
 - shoot-on-the-move compensation
 - pitch, exit velocity, turret yaw, and feedforward angular velocities
 - stability gating telemetry
+
+When `ferryShotRequested` is true and the robot is in the neutral zone, `ShotCalculator` targets the closer ferry point through the same superstructure readiness path as hub shots.
 
 `ShotVectorCompensator` contains the field/shooter-frame vector math. Keep coordinate-frame changes localized there or in `ShotCalculator`.
 

@@ -236,6 +236,11 @@ public class Indexer {
     runVelocityRPM(intakeRPM.get());
   }
 
+  /** Runs the configured feed path backwards for operator-controlled clearing. */
+  public void runReverseIntakeVelocity() {
+    runVelocityRPM(-intakeRPM.get());
+  }
+
   public void runVolts(double volts) {
     closedLoop = false;
     targetVelocityRadPerSec = 0.0;

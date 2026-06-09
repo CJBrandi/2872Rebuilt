@@ -61,14 +61,13 @@ public class ShotCalculator {
 
   private enum ShotMode {
     HUB,
+    FERRY,
     LOB_LEFT,
-    LOB_RIGHT,
-    ALLIANCE_HUB
+    LOB_RIGHT
   }
 
   public enum TargetingMode {
-    AUTO,
-    ALLIANCE_HUB
+    AUTO
   }
 
   private static class LookupProfile {
@@ -263,8 +262,9 @@ public class ShotCalculator {
     ShootingParameters requestedShot =
         new ShootingParameters(
             normalizeTo0To2Pi(shot.yaw()), 0.0, shot.pitch(), 0.0, shot.exitVelocity());
+    boolean ferryShot = isFerryShotMode(selection.shotMode());
     boolean lobShot = isLobShotMode(selection.shotMode());
-    if (lobShot) {
+    if (ferryShot || lobShot) {
       requestedShot = applyLobScaling(requestedShot);
     }
 
@@ -293,6 +293,7 @@ public class ShotCalculator {
     Logger.recordOutput("ShotCalculator/VectorLookupLoaded", true);
     Logger.recordOutput("ShotCalculator/HubLookupLoaded", hubLookupProfile.loaded);
     Logger.recordOutput("ShotCalculator/ShotMode", selection.shotMode().name());
+    Logger.recordOutput("ShotCalculator/FerryScalingApplied", ferryShot);
     Logger.recordOutput("ShotCalculator/LobScalingApplied", lobShot);
     Logger.recordOutput("ShotCalculator/ShotStable", shotStable);
     Logger.recordOutput("ShotCalculator/SelectionRobotX", robotPose.getX());
@@ -344,8 +345,12 @@ public class ShotCalculator {
   }
 
   private ShotSelection selectShotSelection(Pose2d robotPose) {
-    if (targetingMode == TargetingMode.ALLIANCE_HUB) {
-      return new ShotSelection(ShotMode.ALLIANCE_HUB, hubLookupProfile, selectAllianceHubTarget());
+    if (RobotState.getInstance().isFerryShotRequested()
+        && FieldConstants.Ferry.isRobotInNeutralZone(robotPose.getX())) {
+      return new ShotSelection(
+          ShotMode.FERRY,
+          hubLookupProfile,
+          FieldConstants.Ferry.getCloserTarget(robotPose.getTranslation()));
     }
 
     boolean flipFieldCoordinates = AllianceFlipUtil.shouldFlip();
@@ -357,19 +362,17 @@ public class ShotCalculator {
           ShotMode.HUB,
           hubLookupProfile,
           FieldConstants.Hub.topCenterPoint.get().toTranslation2d());
+      case FERRY -> new ShotSelection(
+          ShotMode.FERRY,
+          hubLookupProfile,
+          FieldConstants.Ferry.getCloserTarget(robotPose.getTranslation()));
       case LOB_LEFT -> new ShotSelection(
           ShotMode.LOB_LEFT, hubLookupProfile, selectAllianceLobTarget(true, flipFieldCoordinates));
       case LOB_RIGHT -> new ShotSelection(
           ShotMode.LOB_RIGHT,
           hubLookupProfile,
           selectAllianceLobTarget(false, flipFieldCoordinates));
-      case ALLIANCE_HUB -> new ShotSelection(
-          ShotMode.ALLIANCE_HUB, hubLookupProfile, selectAllianceHubTarget());
     };
-  }
-
-  private Translation2d selectAllianceHubTarget() {
-    return FieldConstants.Hub.topCenterPoint.get().toTranslation2d();
   }
 
   static Translation2d selectAllianceLobTarget(boolean leftTarget, boolean flipFieldCoordinates) {
@@ -504,6 +507,10 @@ public class ShotCalculator {
 
   private static boolean isLobShotMode(ShotMode shotMode) {
     return shotMode == ShotMode.LOB_LEFT || shotMode == ShotMode.LOB_RIGHT;
+  }
+
+  private static boolean isFerryShotMode(ShotMode shotMode) {
+    return shotMode == ShotMode.FERRY;
   }
 
   private static Rotation2d normalizeTo0To2Pi(Rotation2d angle) {

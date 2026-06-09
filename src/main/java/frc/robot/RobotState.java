@@ -19,7 +19,6 @@ public class RobotState {
 
   public enum TurretShooterMode {
     SOTM,
-    AIM,
     MANUAL
   }
 
@@ -29,6 +28,7 @@ public class RobotState {
   @Getter private boolean hasBestFuelCluster = false;
 
   @Getter @Setter private boolean autoEmpty = false;
+  @Getter @Setter private boolean ferryShotRequested = false;
   @Getter @Setter private TurretShooterMode turretShooterRequestedMode = TurretShooterMode.SOTM;
 
   @Getter @Setter private TurretShooterMode turretShooterActiveMode = TurretShooterMode.SOTM;
@@ -77,19 +77,12 @@ public class RobotState {
     hasBestFuelCluster = false;
   }
 
-  public boolean isSotm() {
-    return turretShooterRequestedMode == TurretShooterMode.SOTM;
-  }
-
-  public void setSotm(boolean sotm) {
-    turretShooterRequestedMode = sotm ? TurretShooterMode.SOTM : TurretShooterMode.AIM;
-  }
-
   public void periodic() {
     // Calculate horizontal distance from robot to HUB
     Translation3d hubCenter = FieldConstants.Hub.topCenterPoint.get();
     double horizontalDistance = robotPose.getTranslation().getDistance(hubCenter.toTranslation2d());
     Logger.recordOutput("RobotState/AutoEmpty", autoEmpty);
+    Logger.recordOutput("RobotState/FerryShotRequested", ferryShotRequested);
     Logger.recordOutput("RobotState/TurretShooterRequestedMode", turretShooterRequestedMode.name());
     Logger.recordOutput("RobotState/TurretShooterActiveMode", turretShooterActiveMode.name());
     Logger.recordOutput("RobotState/HubDistanceMeters", horizontalDistance);

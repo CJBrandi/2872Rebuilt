@@ -94,7 +94,7 @@ public class Autos {
         Commands.runOnce(
             () ->
                 RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM)),
         Commands.runOnce(intake::deploy),
         Commands.waitUntil(intake::isAtGoal),
         AutoBuilder.followPath(pathOne),
@@ -139,7 +139,7 @@ public class Autos {
         Commands.runOnce(
             () ->
                 RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM)),
         Commands.runOnce(intake::deploy),
         Commands.waitUntil(intake::isAtGoal),
         AutoBuilder.followPath(pathOne),
@@ -149,7 +149,7 @@ public class Autos {
         Commands.runOnce(
             () ->
                 RobotState.getInstance()
-                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.AIM)),
+                    .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM)),
         AutoBuilder.followPath(pathTwo),
         Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true)),
         Commands.runOnce(

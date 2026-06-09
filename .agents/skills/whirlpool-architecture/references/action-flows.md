@@ -6,22 +6,23 @@
 2. Vision camera 0 receives a timestamped turret-angle supplier from `RobotState`.
 3. `Autos` is constructed with drive, intake, and superstructure.
 4. Auto and characterization choosers are populated.
-5. `configureButtonBindings()` installs the driver controls.
+5. `configureButtonBindings()` installs the one-controller crazy bindings.
 
 In sim, `FuelSim` is registered with the robot pose, velocity, intake bounding box, and `superstructure::addFuelSimIntaked`.
 
 ## Driver controls
 
-Current `RobotContainer` bindings:
+Current one-controller crazy bindings:
 
-- default drive: `DriveCommands.joystickDriveWithSnakeMode`
-- `B`: reset heading to zero while preserving translation
-- POV up: stow intake, request manual turret/shooter mode, point turret to 180 degrees
-- POV down: deploy intake and request SOTM
-- left trigger: toggles intake roller on press and release
-- `Y`: temporary roller ejection override while held
-- `X`: hood homing command
+- default drive: `DriveCommands.joystickDrive`
+- left trigger: deploy intake and run intake roller while held; release stops the roller
+- neutral-zone trigger: requests ferry targeting while the robot is in the neutral zone
+- right bumper: stow intake
 - right trigger: sets `RobotState.autoEmpty` true while held
+- `Y`: reset heading to zero while preserving translation
+- `A`: aim-drive at the alliance hub while held
+- `B`: temporary roller ejection override while held
+- `Start+B`: reverse the indexer while held
 
 Keep driver bindings thin. If a button starts needing multi-step mechanism logic, move that logic into a subsystem method or command class.
 
@@ -29,13 +30,14 @@ Keep driver bindings thin. If a button starts needing multi-step mechanism logic
 
 1. Driver or sim sets `RobotState.autoEmpty`.
 2. `Superstructure.periodic()` resolves active mode.
-3. `ShotCalculator` computes shot parameters from pose, velocity, target selection, and lookup data.
-4. `Shooter.setGoals()` receives exit velocity, pitch angle, and pitch velocity.
-5. `Turret.setTargetFieldRelativeAngle()` receives yaw and yaw velocity.
-6. `Shooter.periodic()` runs flywheel and hood control.
-7. `Turret.periodic()` converts field-relative yaw to turret-relative yaw and runs the profile.
-8. `Superstructure.isReadyToShoot()` gates the indexer.
-9. `Indexer.runIntakeVelocity()` feeds only when the gate is true; otherwise `Indexer.stop()` is requested.
+3. `Superstructure` enables static or shoot-on-the-move compensation automatically from robot velocity.
+4. `ShotCalculator` computes shot parameters from pose, velocity, target selection, and lookup data. If `RobotState.ferryShotRequested` is active in the neutral zone, target selection uses the closer ferry point.
+5. `Shooter.setGoals()` receives exit velocity, pitch angle, and pitch velocity.
+6. `Turret.setTargetFieldRelativeAngle()` receives yaw and yaw velocity.
+7. `Shooter.periodic()` runs flywheel and hood control.
+8. `Turret.periodic()` converts field-relative yaw to turret-relative yaw and runs the profile.
+9. `Superstructure.isReadyToShoot()` gates the indexer.
+10. `Indexer.runIntakeVelocity()` feeds only when the gate is true; otherwise `Indexer.stop()` is requested.
 
 Sim shooting additionally calls `Superstructure.launchFuelSim()` from the sim default command when `autoEmpty` is active and the shot period has elapsed.
 

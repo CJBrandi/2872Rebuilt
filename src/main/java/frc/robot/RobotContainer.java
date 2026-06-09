@@ -9,7 +9,6 @@ package frc.robot;
 
 import static frc.robot.subsystems.vision.VisionConstants.*;
 
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.system.plant.DCMotor;
@@ -22,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
+import frc.robot.controls.CrazyModeBindings;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.*;
 import frc.robot.subsystems.elevator.Elevator;
@@ -155,8 +155,9 @@ public class RobotContainer {
         tag =
             new Tag(
                 drive::addVisionMeasurement,
-                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose));
-        // new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose);
+                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose),
+                new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose),
+                new TagIOPhotonVisionSim(runtimeCamera2Config, drive::getPose));
         detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
         break;
 
@@ -246,14 +247,6 @@ public class RobotContainer {
                 }
               },
               superstructure));
-
-      controller
-          .button(1)
-          .onTrue(
-              Commands.runOnce(
-                  () ->
-                      RobotState.getInstance()
-                          .setAutoEmpty(!RobotState.getInstance().isAutoEmpty())));
     }
 
     Autos autos = new Autos(drive, intake, superstructure);
@@ -314,68 +307,7 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    drive.setDefaultCommand(
-        DriveCommands.joystickDriveWithSnakeMode(
-            drive,
-            () -> -controller.getLeftY(),
-            () -> -controller.getLeftX(),
-            () -> -controller.getRightX(),
-            controller.a()));
-
-    controller
-        .b()
-        .onTrue(
-            Commands.runOnce(
-                    () ->
-                        drive.setPose(
-                            new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
-                    drive)
-                .ignoringDisable(true));
-    controller
-        .povUp()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  intake.stow();
-                  RobotState.getInstance()
-                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL);
-                  superstructure.getTurret().setTargetTurretAngle(Rotation2d.k180deg);
-                },
-                intake));
-    controller
-        .povDown()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  intake.deploy();
-                  RobotState.getInstance()
-                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM);
-                },
-                intake));
-
-    controller
-        .leftTrigger()
-        .onTrue(Commands.runOnce(intake::toggleIntake, intake))
-        .onFalse(Commands.runOnce(intake::toggleIntake, intake));
-    controller
-        .y()
-        .onTrue(
-            Commands.runOnce(
-                () -> intake.getRoller().setTemporaryVelocityOverride(Roller.ejectVelocity.get()),
-                intake.getRoller()));
-    controller
-        .y()
-        .onFalse(
-            Commands.runOnce(
-                intake.getRoller()::clearTemporaryVelocityOverride, intake.getRoller()));
-    controller.x().onTrue(superstructure.getShooter().hoodHomingCommand());
-
-    controller
-        .rightTrigger()
-        .onTrue(
-            Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(true))
-                .ignoringDisable(true))
-        .onFalse(Commands.runOnce(() -> RobotState.getInstance().setAutoEmpty(false)));
+    CrazyModeBindings.configure(controller, drive, intake, superstructure);
   }
 
   /**
