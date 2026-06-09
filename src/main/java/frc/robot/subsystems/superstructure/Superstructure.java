@@ -32,13 +32,9 @@ public class Superstructure extends SubsystemBase {
       new LoggedTunableNumber("Superstructure/TrenchIntakeExtraMarginSecs", 0.5);
   private static final LoggedTunableNumber TRENCH_STATIC_ZONE_METERS =
       new LoggedTunableNumber("Superstructure/TrenchStaticZoneMeters", Units.inchesToMeters(6.0));
-  private static final LoggedTunableNumber SOTM_LINEAR_SPEED_THRESHOLD_MPS =
-      new LoggedTunableNumber("Superstructure/SOTMLinearSpeedThresholdMps", 0.15);
-  private static final LoggedTunableNumber SOTM_ANGULAR_SPEED_THRESHOLD_RAD_PER_SEC =
-      new LoggedTunableNumber("Superstructure/SOTMAngularSpeedThresholdRadPerSec", 0.25);
   private static final double TRENCH_CROSSING_EPSILON = 1e-9;
   private static final double TRENCH_INTAKE_EXTENSION_METERS = Units.inchesToMeters(12.0);
-  private static final double SHOT_PITCH_OFFSET_RAD = Units.degreesToRadians(0.5);
+  private static final double AIM_PITCH_OFFSET_RAD = Units.degreesToRadians(0.5);
 
   @Getter private final Shooter shooter;
   @Getter private final Turret turret;
@@ -76,7 +72,7 @@ public class Superstructure extends SubsystemBase {
         var params = shotCalculator.getParameters();
         shooter.setGoals(
             params.exitVelocity(),
-            params.pitchAngle() + SHOT_PITCH_OFFSET_RAD,
+            params.pitchAngle() + AIM_PITCH_OFFSET_RAD,
             params.pitchVelocity());
         turret.setTargetFieldRelativeAngle(params.turretAngle(), params.turretVelocity());
       }
@@ -101,7 +97,6 @@ public class Superstructure extends SubsystemBase {
         robotState.getTurretShooterRequestedMode().name());
     Logger.recordOutput("Superstructure/ActiveTurretShooterMode", activeTurretShooterMode.name());
     Logger.recordOutput("Superstructure/ManualEnabled", manualModeEnabled.get() > 0.5);
-    Logger.recordOutput("Superstructure/SOTMCompensationActive", shouldUseShootOnMove(robotState));
     Logger.recordOutput("Superstructure/TrenchStowActive", trenchStowActive);
     Logger.recordOutput("Superstructure/TrenchIntakeDeployActive", trenchIntakeDeployActive);
     Logger.recordOutput("Superstructure/FuelSimInventoryCount", fuelSimInventoryCount);
@@ -346,29 +341,24 @@ public class Superstructure extends SubsystemBase {
     if (manualModeEnabled.get() > 0.5) {
       return RobotState.TurretShooterMode.MANUAL;
     }
-    return RobotState.TurretShooterMode.SOTM;
+    return robotState.getTurretShooterRequestedMode();
   }
 
   private void configureShotCalculator(RobotState.TurretShooterMode mode) {
     switch (mode) {
       case SOTM -> {
-        shotCalculator.setShootOnMoveEnabled(shouldUseShootOnMove(RobotState.getInstance()));
+        shotCalculator.setShootOnMoveEnabled(true);
         shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.AUTO);
+      }
+      case AIM -> {
+        shotCalculator.setShootOnMoveEnabled(false);
+        shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.ALLIANCE_HUB);
       }
       case MANUAL -> {
         shotCalculator.setShootOnMoveEnabled(false);
         shotCalculator.setTargetingMode(ShotCalculator.TargetingMode.AUTO);
       }
     }
-  }
-
-  private boolean shouldUseShootOnMove(RobotState robotState) {
-    ChassisSpeeds robotVelocity = robotState.getRobotVelocity();
-    double linearSpeed =
-        Math.hypot(robotVelocity.vxMetersPerSecond, robotVelocity.vyMetersPerSecond);
-    double angularSpeed = Math.abs(robotVelocity.omegaRadiansPerSecond);
-    return linearSpeed >= Math.max(0.0, SOTM_LINEAR_SPEED_THRESHOLD_MPS.get())
-        || angularSpeed >= Math.max(0.0, SOTM_ANGULAR_SPEED_THRESHOLD_RAD_PER_SEC.get());
   }
 
   /** Increments simulated shooter inventory when a fuel enters the intake box. */

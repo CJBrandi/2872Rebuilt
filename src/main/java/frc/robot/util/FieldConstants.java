@@ -277,32 +277,6 @@ public class FieldConstants {
         new FlippableTranslation3d(LOB_LEFT_POINT.getX(), LOB_LEFT_POINT.getY(), 0.0);
   }
 
-  /** Ferry-shot targets and neutral-zone helpers. */
-  public static class Ferry {
-    private static final Translation2d HUB_CENTER = Hub.topCenterPoint.getBlue().toTranslation2d();
-    private static final Translation2d LEFT_TARGET = HUB_CENTER.plus(new Translation2d(-3.0, 2.0));
-    private static final Translation2d RIGHT_TARGET =
-        HUB_CENTER.plus(new Translation2d(-3.0, -2.0));
-
-    public static final FlippableTranslation3d LEFT =
-        new FlippableTranslation3d(LEFT_TARGET.getX(), LEFT_TARGET.getY(), 0.0);
-    public static final FlippableTranslation3d RIGHT =
-        new FlippableTranslation3d(RIGHT_TARGET.getX(), RIGHT_TARGET.getY(), 0.0);
-
-    public static boolean isRobotInNeutralZone(double robotXMeters) {
-      return robotXMeters >= LinesVertical.neutralZoneNear
-          && robotXMeters <= LinesVertical.neutralZoneFar;
-    }
-
-    public static Translation2d getCloserTarget(Translation2d robotTranslation) {
-      Translation2d leftTarget = LEFT.get().toTranslation2d();
-      Translation2d rightTarget = RIGHT.get().toTranslation2d();
-      return robotTranslation.getDistance(leftTarget) <= robotTranslation.getDistance(rightTarget)
-          ? leftTarget
-          : rightTarget;
-    }
-  }
-
   /** Left Bump related constants */
   public static class LeftBump {
 

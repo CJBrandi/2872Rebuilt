@@ -25,7 +25,7 @@ public class Hood {
   private static final double MIN_ANGLE_RAD = Math.toRadians(15.5);
   private static final double MAX_ANGLE_RAD = MIN_ANGLE_RAD + Math.toRadians(30.0);
 
-  // PID gains (output in Amps for TorqueCurrentFOC)
+  // PID gains for the Talon closed loop.
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Shooter/Hood/kP");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Shooter/Hood/kD");
   // Feedforward gains (Amps)

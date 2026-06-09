@@ -155,9 +155,8 @@ public class RobotContainer {
         tag =
             new Tag(
                 drive::addVisionMeasurement,
-                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose),
-                new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose),
-                new TagIOPhotonVisionSim(runtimeCamera2Config, drive::getPose));
+                new TagIOPhotonVisionSim(runtimeCamera0Config, drive::getPose));
+        // new TagIOPhotonVisionSim(runtimeCamera1Config, drive::getPose);
         detection = new Detection(drive::getPose, new DetectionIOSim(drive::getPose));
         break;
 
@@ -247,6 +246,14 @@ public class RobotContainer {
                 }
               },
               superstructure));
+
+      controller
+          .button(1)
+          .onTrue(
+              Commands.runOnce(
+                  () ->
+                      RobotState.getInstance()
+                          .setAutoEmpty(!RobotState.getInstance().isAutoEmpty())));
     }
 
     Autos autos = new Autos(drive, intake, superstructure);

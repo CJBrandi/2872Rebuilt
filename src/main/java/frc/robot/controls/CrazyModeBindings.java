@@ -5,7 +5,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.RobotState;
 import frc.robot.commands.DriveCommands;
 import frc.robot.subsystems.drive.Drive;
@@ -33,12 +32,6 @@ public final class CrazyModeBindings {
                 },
                 intake,
                 intake.getRoller()));
-
-    new Trigger(() -> FieldConstants.Ferry.isRobotInNeutralZone(drive.getPose().getX()))
-        .whileTrue(
-            Commands.startEnd(
-                () -> RobotState.getInstance().setFerryShotRequested(true),
-                () -> RobotState.getInstance().setFerryShotRequested(false)));
 
     driver.rightBumper().onTrue(Commands.runOnce(intake::stow, intake));
 
