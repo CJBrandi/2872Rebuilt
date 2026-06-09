@@ -6,11 +6,11 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
@@ -36,6 +36,7 @@ public class TurretIOTalonFX implements TurretIO {
 
   // Control requests
   private final VoltageOut voltageRequest = new VoltageOut(0.0);
+  private final TorqueCurrentFOC currentRequest = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final PositionVoltage positionRequest = new PositionVoltage(0.0);
 
   // Status signals
@@ -123,7 +124,7 @@ public class TurretIOTalonFX implements TurretIO {
 
   @Override
   public void runCurrent(double currentAmps) {
-    talon.setControl(voltageRequest.withOutput(MathUtil.clamp(currentAmps, -12.0, 12.0)));
+    talon.setControl(currentRequest.withOutput(currentAmps));
   }
 
   @Override

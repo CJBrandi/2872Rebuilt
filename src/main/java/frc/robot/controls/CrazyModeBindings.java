@@ -84,7 +84,7 @@ public final class CrazyModeBindings {
         .and(driver.b())
         .whileTrue(
             Commands.startEnd(
-                superstructure.getIndexer()::runReverseIntakeVelocity,
+                () -> superstructure.getIndexer().runVolts(-2.0),
                 superstructure.getIndexer()::stop));
   }
 }

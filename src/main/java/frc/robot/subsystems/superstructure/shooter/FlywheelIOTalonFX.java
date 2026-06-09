@@ -7,14 +7,14 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.Follower;
-import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
+import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
@@ -49,8 +49,10 @@ public class FlywheelIOTalonFX implements FlywheelIO {
   private final Debouncer encoderConnectedDebouncer = new Debouncer(0.5);
 
   // Control requests
-  private final VelocityVoltage velocityVoltageRequest =
-      new VelocityVoltage(0.0).withUpdateFreqHz(0.0);
+  private final TorqueCurrentFOC torqueCurrentRequest =
+      new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+  private final VelocityTorqueCurrentFOC velocityTorqueCurrentRequest =
+      new VelocityTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final VoltageOut voltageRequest = new VoltageOut(0.0).withUpdateFreqHz(0.0);
 
   public FlywheelIOTalonFX(int canId, int followerCanId) {
@@ -121,7 +123,7 @@ public class FlywheelIOTalonFX implements FlywheelIO {
 
   @Override
   public void runOpenLoop(double output) {
-    talon.setControl(voltageRequest.withOutput(MathUtil.clamp(output, -12.0, 12.0)));
+    talon.setControl(torqueCurrentRequest.withOutput(output));
   }
 
   @Override
@@ -136,7 +138,8 @@ public class FlywheelIOTalonFX implements FlywheelIO {
 
   @Override
   public void runVelocity(double radsPerSec) {
-    talon.setControl(velocityVoltageRequest.withVelocity(Units.radiansToRotations(radsPerSec)));
+    talon.setControl(
+        velocityTorqueCurrentRequest.withVelocity(Units.radiansToRotations(radsPerSec)));
   }
 
   @Override

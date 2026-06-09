@@ -18,7 +18,6 @@ import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
@@ -38,8 +37,9 @@ public class RollerIOTalonFX implements RollerIO {
   private final StatusSignal<Temperature> tempCelsius;
 
   // Control requests
-  private final VelocityVoltage velocityVoltageRequest =
-      new VelocityVoltage(0.0).withUpdateFreqHz(0.0);
+  private final VelocityTorqueCurrentFOC velocityTorqueCurrentFOC =
+      new VelocityTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+  private final TorqueCurrentFOC torqueCurrentFOC = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final VoltageOut voltageOut = new VoltageOut(0.0).withUpdateFreqHz(0);
   private final NeutralOut neutralOut = new NeutralOut();
 
@@ -97,12 +97,12 @@ public class RollerIOTalonFX implements RollerIO {
 
   @Override
   public void runVelocity(double velocityRPS) {
-    talon.setControl(velocityVoltageRequest.withVelocity(velocityRPS));
+    talon.setControl(velocityTorqueCurrentFOC.withVelocity(velocityRPS));
   }
 
   @Override
   public void runTorqueCurrent(double current) {
-    talon.setControl(voltageOut.withOutput(MathUtil.clamp(current, -12.0, 12.0)));
+    talon.setControl(torqueCurrentFOC.withOutput(current));
   }
 
   @Override
