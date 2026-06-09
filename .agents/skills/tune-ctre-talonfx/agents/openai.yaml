@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tune CTRE TalonFX"
+  short_description: "Phoenix-style TalonFX PID tuning"
+  default_prompt: "Use $tune-ctre-talonfx to tune a TalonFX mechanism with safe limits and telemetry."

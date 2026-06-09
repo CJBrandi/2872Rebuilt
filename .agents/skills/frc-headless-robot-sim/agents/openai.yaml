@@ -1,0 +1,4 @@
+interface:
+  display_name: "FRC Headless Robot Sim"
+  short_description: "Validate WPILib robot changes with GymSim"
+  default_prompt: "Use $frc-headless-robot-sim in 2872Rebuilt to write or run GymSim scenarios, inspect WPILOG evidence, and verify robot-code behavior in headless simulation."

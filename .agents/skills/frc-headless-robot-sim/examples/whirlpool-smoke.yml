@@ -1,0 +1,14 @@
+name: whirlpool-smoke
+timeout_s: 10
+robot:
+  alliance: blue1
+steps:
+  - disable: {}
+  - enable: autonomous
+  - schedule: { command: "getAutonomousCommand()" }
+  - wait_seconds: 1.0
+  - cancel: { command: "getAutonomousCommand()" }
+  - disable: {}
+assertions:
+  - log_exists: { key: GymSim/Active }
+  - no_driverstation_errors: {}

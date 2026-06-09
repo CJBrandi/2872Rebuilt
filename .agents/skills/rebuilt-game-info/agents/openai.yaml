@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rebuilt Game Info"
+  short_description: "2026 FRC REBUILT game context"
+  default_prompt: "Use $rebuilt-game-info to explain the 2026 REBUILT game in robot-relevant terms."

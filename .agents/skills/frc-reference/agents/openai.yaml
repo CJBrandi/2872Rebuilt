@@ -1,0 +1,4 @@
+interface:
+  display_name: "FRC-Reference"
+  short_description: "FRC docs, Javadocs, Limelight, and telemetry reference"
+  default_prompt: "Use $frc-reference for FRC Java API lookup, official docs/Javadocs, Limelight, .wpilog, NetworkTables, and simulation debugging."

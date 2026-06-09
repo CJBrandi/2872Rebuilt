@@ -1,0 +1,6 @@
+interface:
+  display_name: "Whirlpool Architecture"
+  short_description: "2872Rebuilt robot architecture guide"
+  default_prompt: "Use $whirlpool-architecture to inspect the Whirlpool robot code before changing subsystem behavior."
+policy:
+  allow_implicit_invocation: true
