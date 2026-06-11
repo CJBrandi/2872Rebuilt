@@ -323,7 +323,7 @@ public class RobotContainer {
             controller.a()));
 
     controller
-        .b()
+        .y()
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -331,43 +331,26 @@ public class RobotContainer {
                             new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
                     drive)
                 .ignoringDisable(true));
-    controller
-        .povUp()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  intake.stow();
-                  RobotState.getInstance()
-                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.MANUAL);
-                  superstructure.getTurret().setTargetTurretAngle(Rotation2d.k180deg);
-                },
-                intake));
-    controller
-        .povDown()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  intake.deploy();
-                  RobotState.getInstance()
-                      .setTurretShooterRequestedMode(RobotState.TurretShooterMode.SOTM);
-                },
-                intake));
 
     controller
-        .leftTrigger()
-        .onTrue(Commands.runOnce(intake::toggleIntake, intake))
-        .onFalse(Commands.runOnce(intake::toggleIntake, intake));
+        .leftBumper()
+        .onTrue(
+            Commands.runOnce(intake::stow, intake));
+    
     controller
-        .y()
+        .leftTrigger()
+        .onTrue(Commands.runOnce(intake::deploy, intake))
+        .onFalse(Commands.runOnce(intake::toggleIntake, intake));
+
+    controller
+        .b()
         .onTrue(
             Commands.runOnce(
                 () -> intake.getRoller().setTemporaryVelocityOverride(Roller.ejectVelocity.get()),
-                intake.getRoller()));
-    controller
-        .y()
-        .onFalse(
-            Commands.runOnce(
+                intake.getRoller()))
+        .onFalse(Commands.runOnce(
                 intake.getRoller()::clearTemporaryVelocityOverride, intake.getRoller()));
+
     controller.x().onTrue(superstructure.getShooter().hoodHomingCommand());
 
     controller
