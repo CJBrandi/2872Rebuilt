@@ -9,6 +9,8 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.commands.OrchestraCommand;
 import frc.robot.util.FuelSim;
 import frc.robot.util.HubShiftUtil;
 import org.littletonrobotics.junction.LogFileUtil;
@@ -26,6 +28,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
  */
 public class Robot extends LoggedRobot {
   private Command autonomousCommand;
+  private Command orchestraCommand;
   private RobotContainer robotContainer;
   private boolean homingScheduledThisBoot = false;
 
@@ -80,6 +83,11 @@ public class Robot extends LoggedRobot {
     // Instantiate our RobotContainer. This will perform all our button bindings,
     // and put our autonomous chooser on the dashboard.
     robotContainer = new RobotContainer();
+    orchestraCommand =
+        robotContainer.getOrchestraMotors().isEmpty()
+            ? Commands.none()
+            : new OrchestraCommand(robotContainer.getOrchestraMotors(), "mario.chrp")
+                .ignoringDisable(true);
   }
 
   /** This function is called periodically during all modes. */
@@ -106,7 +114,14 @@ public class Robot extends LoggedRobot {
 
   /** This function is called once when the robot is disabled. */
   @Override
-  public void disabledInit() {}
+  public void disabledInit() {
+    CommandScheduler.getInstance().schedule(orchestraCommand);
+  }
+
+  @Override
+  public void disabledExit() {
+    CommandScheduler.getInstance().cancel(orchestraCommand);
+  }
 
   /** This function is called periodically when disabled. */
   @Override

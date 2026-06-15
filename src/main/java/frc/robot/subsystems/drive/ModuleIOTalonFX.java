@@ -101,6 +101,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     // Configure drive motor
     var driveConfig = constants.DriveMotorInitialConfigs;
+    driveConfig.Audio.AllowMusicDurDisable = true;
     driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     driveConfig.Slot0 = constants.DriveMotorGains;
     driveConfig.Feedback.SensorToMechanismRatio = constants.DriveMotorGearRatio;
@@ -117,6 +118,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     // Configure turn motor
     var turnConfig = new TalonFXConfiguration();
+    turnConfig.Audio.AllowMusicDurDisable = true;
     turnConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     turnConfig.Slot0 = constants.SteerMotorGains;
     turnConfig.Feedback.FeedbackRemoteSensorID = constants.EncoderId;
@@ -181,6 +183,14 @@ public class ModuleIOTalonFX implements ModuleIO {
         turnAppliedVolts,
         turnCurrent);
     ParentDevice.optimizeBusUtilizationForAll(driveTalon, turnTalon);
+  }
+
+  public TalonFX getDriveTalon() {
+    return driveTalon;
+  }
+
+  public TalonFX getTurnTalon() {
+    return turnTalon;
   }
 
   @Override

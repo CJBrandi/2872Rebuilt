@@ -53,6 +53,7 @@ public class TurretIOTalonFX implements TurretIO {
 
     // Configure motor
     TalonFXConfiguration config = new TalonFXConfiguration();
+    config.Audio.AllowMusicDurDisable = true;
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
 
@@ -96,6 +97,10 @@ public class TurretIOTalonFX implements TurretIO {
     talon.optimizeBusUtilization();
 
     talon.setPosition(Units.degreesToRotations(-180));
+  }
+
+  public TalonFX getTalon() {
+    return talon;
   }
 
   @Override

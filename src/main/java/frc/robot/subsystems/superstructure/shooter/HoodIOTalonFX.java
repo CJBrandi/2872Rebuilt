@@ -52,6 +52,7 @@ public class HoodIOTalonFX implements HoodIO {
     talon = new TalonFX(canId, canBus);
 
     // Configure motor
+    config.Audio.AllowMusicDurDisable = true;
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
     config.Feedback.SensorToMechanismRatio = reduction;
@@ -72,6 +73,10 @@ public class HoodIOTalonFX implements HoodIO {
     BaseStatusSignal.setUpdateFrequencyForAll(
         250.0, position, velocity, appliedVolts, torqueCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  public TalonFX getTalon() {
+    return talon;
   }
 
   @Override

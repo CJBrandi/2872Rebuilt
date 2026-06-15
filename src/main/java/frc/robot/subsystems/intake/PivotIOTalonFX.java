@@ -65,6 +65,7 @@ public class PivotIOTalonFX implements PivotIO {
     talon = new TalonFX(canId, canBus);
 
     // Configure  motor
+    Config.Audio.AllowMusicDurDisable = true;
     Config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     Config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
     Config.Feedback.FeedbackSensorSource = FeedbackSensorSourceValue.RotorSensor;
@@ -98,6 +99,10 @@ public class PivotIOTalonFX implements PivotIO {
         current,
         temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  public TalonFX getTalon() {
+    return talon;
   }
 
   @Override

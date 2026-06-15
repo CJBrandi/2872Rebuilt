@@ -64,6 +64,7 @@ public class FlywheelIOTalonFX implements FlywheelIO {
     followerTalon = new TalonFX(followerCanId, canBus);
 
     // Configure motor
+    config.Audio.AllowMusicDurDisable = true;
     config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     config.Slot0 = new Slot0Configs().withKS(0).withKV(0).withKP(0).withKI(0).withKD(0);
@@ -99,6 +100,14 @@ public class FlywheelIOTalonFX implements FlywheelIO {
         followerSupplyCurrent,
         followerTemp);
     ParentDevice.optimizeBusUtilizationForAll(talon, followerTalon);
+  }
+
+  public TalonFX getTalon() {
+    return talon;
+  }
+
+  public TalonFX getFollowerTalon() {
+    return followerTalon;
   }
 
   @Override

@@ -49,6 +49,7 @@ public class RollerIOTalonFX implements RollerIO {
     talon = new TalonFX(canId, canBus);
 
     // Configure for Kraken X44 with velocity control
+    config.Audio.AllowMusicDurDisable = true;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.CurrentLimits.SupplyCurrentLimit = 40;
@@ -78,6 +79,10 @@ public class RollerIOTalonFX implements RollerIO {
                 torqueCurrent,
                 tempCelsius));
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  public TalonFX getTalon() {
+    return talon;
   }
 
   @Override

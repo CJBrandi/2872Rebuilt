@@ -53,6 +53,7 @@ public class IndexerIOTalonFX implements IndexerIO {
   public IndexerIOTalonFX(int canId, String canBus) {
     talon = new TalonFX(canId, canBus);
 
+    config.Audio.AllowMusicDurDisable = true;
     config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
     config.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
     config.Slot0 = new Slot0Configs().withKS(0.0).withKV(0.0).withKP(0.0).withKI(0.0).withKD(0.0);
@@ -72,6 +73,10 @@ public class IndexerIOTalonFX implements IndexerIO {
     BaseStatusSignal.setUpdateFrequencyForAll(
         250.0, velocity, appliedVolts, torqueCurrent, supplyCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
+  }
+
+  public TalonFX getTalon() {
+    return talon;
   }
 
   @Override

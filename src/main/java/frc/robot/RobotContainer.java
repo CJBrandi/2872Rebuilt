@@ -9,6 +9,7 @@ package frc.robot;
 
 import static frc.robot.subsystems.vision.VisionConstants.*;
 
+import com.ctre.phoenix6.hardware.traits.CommonDevice;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -41,6 +42,7 @@ import frc.robot.subsystems.superstructure.turret.TurretIOTalonFX;
 import frc.robot.subsystems.vision.*;
 import frc.robot.util.Autos;
 import frc.robot.util.FuelSim;
+import java.util.ArrayList;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -57,6 +59,7 @@ public class RobotContainer {
   private final Intake intake;
   private Tag tag;
   private Detection detection;
+  private final ArrayList<CommonDevice> orchestraMotors = new ArrayList<>();
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
 
@@ -76,43 +79,67 @@ public class RobotContainer {
 
     switch (Constants.getCurrentMode()) {
       case REAL:
+        ModuleIOTalonFX frontLeftModule = new ModuleIOTalonFX(TunerConstants.FrontLeft);
+        ModuleIOTalonFX frontRightModule = new ModuleIOTalonFX(TunerConstants.FrontRight);
+        ModuleIOTalonFX backLeftModule = new ModuleIOTalonFX(TunerConstants.BackLeft);
+        ModuleIOTalonFX backRightModule = new ModuleIOTalonFX(TunerConstants.BackRight);
+
+        orchestraMotors.add(frontLeftModule.getDriveTalon());
+        orchestraMotors.add(frontLeftModule.getTurnTalon());
+        orchestraMotors.add(frontRightModule.getDriveTalon());
+        orchestraMotors.add(frontRightModule.getTurnTalon());
+        orchestraMotors.add(backLeftModule.getDriveTalon());
+        orchestraMotors.add(backLeftModule.getTurnTalon());
+        orchestraMotors.add(backRightModule.getDriveTalon());
+        orchestraMotors.add(backRightModule.getTurnTalon());
+
         drive =
             new Drive(
                 new GyroIOPigeon2(),
-                new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                new ModuleIOTalonFX(TunerConstants.FrontRight),
-                new ModuleIOTalonFX(TunerConstants.BackLeft),
-                new ModuleIOTalonFX(TunerConstants.BackRight));
+                frontLeftModule,
+                frontRightModule,
+                backLeftModule,
+                backRightModule);
 
-        intake =
-            new Intake(
-                new PivotIOTalonFX(
-                    Constants.IntakeConstants.PivotConstants.canId,
-                    Constants.IntakeConstants.canBus),
-                new RollerIOTalonFX(
-                    Constants.IntakeConstants.RollerConstants.canId,
-                    Constants.IntakeConstants.canBus));
+        PivotIOTalonFX pivotIO =
+            new PivotIOTalonFX(
+                Constants.IntakeConstants.PivotConstants.canId, Constants.IntakeConstants.canBus);
+        RollerIOTalonFX rollerIO =
+            new RollerIOTalonFX(
+                Constants.IntakeConstants.RollerConstants.canId, Constants.IntakeConstants.canBus);
+        orchestraMotors.add(pivotIO.getTalon());
+        orchestraMotors.add(rollerIO.getTalon());
+        intake = new Intake(pivotIO, rollerIO);
+
+        FlywheelIOTalonFX flywheelIO =
+            new FlywheelIOTalonFX(
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.followerCanId,
+                Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canBus);
+        HoodIOTalonFX hoodIO =
+            new HoodIOTalonFX(
+                Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
+                Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus);
+        TurretIOTalonFX turretIO =
+            new TurretIOTalonFX(
+                Constants.SuperstructureConstants.TurretConstants.canId,
+                Constants.SuperstructureConstants.TurretConstants.canBus);
+        IndexerIOTalonFX indexerIO =
+            new IndexerIOTalonFX(
+                Constants.SuperstructureConstants.IndexerConstants.canId,
+                Constants.SuperstructureConstants.IndexerConstants.canBus);
+
+        orchestraMotors.add(flywheelIO.getTalon());
+        orchestraMotors.add(flywheelIO.getFollowerTalon());
+        orchestraMotors.add(hoodIO.getTalon());
+        orchestraMotors.add(turretIO.getTalon());
+        orchestraMotors.add(indexerIO.getTalon());
 
         superstructure =
             new Superstructure(
-                new Shooter(
-                    new FlywheelIOTalonFX(
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants.canId,
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
-                            .followerCanId,
-                        Constants.SuperstructureConstants.ShooterConstants.FlywheelConstants
-                            .canBus),
-                    new HoodIOTalonFX(
-                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canId,
-                        Constants.SuperstructureConstants.ShooterConstants.HoodConstants.canBus)),
-                new Turret(
-                    new TurretIOTalonFX(
-                        Constants.SuperstructureConstants.TurretConstants.canId,
-                        Constants.SuperstructureConstants.TurretConstants.canBus)),
-                new Indexer(
-                    new IndexerIOTalonFX(
-                        Constants.SuperstructureConstants.IndexerConstants.canId,
-                        Constants.SuperstructureConstants.IndexerConstants.canBus)),
+                new Shooter(flywheelIO, hoodIO),
+                new Turret(turretIO),
+                new Indexer(indexerIO),
                 intake);
 
         elevator = new Elevator(new ElevatorIO() {});
@@ -332,11 +359,8 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    controller
-        .leftBumper()
-        .onTrue(
-            Commands.runOnce(intake::stow, intake));
-    
+    controller.leftBumper().onTrue(Commands.runOnce(intake::stow, intake));
+
     controller
         .leftTrigger()
         .onTrue(Commands.runOnce(intake::deploy, intake))
@@ -348,7 +372,8 @@ public class RobotContainer {
             Commands.runOnce(
                 () -> intake.getRoller().setTemporaryVelocityOverride(Roller.ejectVelocity.get()),
                 intake.getRoller()))
-        .onFalse(Commands.runOnce(
+        .onFalse(
+            Commands.runOnce(
                 intake.getRoller()::clearTemporaryVelocityOverride, intake.getRoller()));
 
     controller.x().onTrue(superstructure.getShooter().hoodHomingCommand());
@@ -368,6 +393,10 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return auto.get();
+  }
+
+  public ArrayList<CommonDevice> getOrchestraMotors() {
+    return orchestraMotors;
   }
 
   public Command getHomingCommand() {
